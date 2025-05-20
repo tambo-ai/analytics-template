@@ -44,7 +44,7 @@ export const ScrollableMessageContainer = React.forwardRef<
             behavior: "smooth",
           });
         }
-      }, 100);
+      }, 250);
 
       return () => clearTimeout(timeoutId);
     }
@@ -58,7 +58,7 @@ export const ScrollableMessageContainer = React.forwardRef<
         "[&::-webkit-scrollbar]:w-[6px]",
         "[&::-webkit-scrollbar-thumb]:bg-gray-300",
         "[&::-webkit-scrollbar:horizontal]:h-[4px]",
-        className,
+        className
       )}
       data-slot="scrollable-message-container"
       {...props}

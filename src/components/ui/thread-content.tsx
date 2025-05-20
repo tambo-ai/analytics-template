@@ -130,18 +130,6 @@ const ThreadContentMessages = React.forwardRef<
   ThreadContentMessagesProps
 >(({ className, ...props }, ref) => {
   const { messages, isGenerating, variant } = useThreadContentContext();
-  const messagesEndRef = React.useRef<HTMLDivElement>(null);
-
-  const scrollToBottom = React.useCallback(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, []);
-
-  // Scroll to bottom when messages change or generation status changes
-  React.useEffect(() => {
-    scrollToBottom();
-  }, [messages.length, isGenerating, scrollToBottom]);
 
   return (
     <div
@@ -201,8 +189,6 @@ const ThreadContentMessages = React.forwardRef<
           </div>
         );
       })}
-      {/* Empty div at the end for scrolling reference */}
-      <div ref={messagesEndRef} />
     </div>
   );
 });
