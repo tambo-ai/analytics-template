@@ -4,11 +4,11 @@ import { components } from "@/lib/tambo";
 import { cn } from "@/lib/utils";
 import { TamboComponent } from "@tambo-ai/react";
 import {
+  CheckIcon,
+  PencilIcon,
   PlusIcon,
   TrashIcon,
   XIcon,
-  PencilIcon,
-  CheckIcon,
 } from "lucide-react";
 import * as React from "react";
 
@@ -38,8 +38,15 @@ export const ComponentsCanvas: React.FC<
   React.HTMLAttributes<HTMLDivElement>
 > = ({ className, ...props }) => {
   const [canvases, setCanvases] = React.useState<Canvas[]>([]);
-  const [activeCanvasId, setActiveCanvasId] = React.useState<string | null>(null);
-  const [editingCanvasId, setEditingCanvasId] = React.useState<string | null>(null);
+  const [activeCanvasId, setActiveCanvasId] = React.useState<string | null>(
+    null
+  );
+  const [editingCanvasId, setEditingCanvasId] = React.useState<string | null>(
+    null
+  );
+  const [pendingDeleteCanvasId, setPendingDeleteCanvasId] = React.useState<
+    string | null
+  >(null);
   const [editingName, setEditingName] = React.useState("");
 
   const STORAGE_KEY = "tambo_canvases";
@@ -54,7 +61,9 @@ export const ComponentsCanvas: React.FC<
         };
         if (Array.isArray(parsed.canvases)) {
           setCanvases(parsed.canvases);
-          setActiveCanvasId(parsed.activeCanvasId || parsed.canvases[0]?.id || null);
+          setActiveCanvasId(
+            parsed.activeCanvasId || parsed.canvases[0]?.id || null
+          );
           return;
         }
       }
@@ -64,7 +73,7 @@ export const ComponentsCanvas: React.FC<
 
     const defaultCanvas: Canvas = {
       id: generateId(),
-      name: "Canvas 1",
+      name: "New Canvas 1",
       components: [],
     };
     setCanvases([defaultCanvas]);
@@ -96,7 +105,7 @@ export const ComponentsCanvas: React.FC<
               prev.map((c) => ({
                 ...c,
                 components: c.components.filter(
-                  (comp) => comp.componentId !== componentProps.componentId,
+                  (comp) => comp.componentId !== componentProps.componentId
                 ),
               }))
             );
@@ -112,14 +121,13 @@ export const ComponentsCanvas: React.FC<
                       {
                         ...componentProps,
                         _inCanvas: true,
-                        componentId:
-                          componentProps.componentId || generateId(),
+                        componentId: componentProps.componentId || generateId(),
                         canvasId: activeCanvasId,
                         _componentType: parsed.component,
                       },
                     ],
                   }
-                : c,
+                : c
             )
           );
         }
@@ -144,19 +152,19 @@ export const ComponentsCanvas: React.FC<
             ? {
                 ...c,
                 components: c.components.filter(
-                  (comp) => comp.componentId !== componentId,
+                  (comp) => comp.componentId !== componentId
                 ),
               }
-            : c,
+            : c
         )
       );
     },
-    [],
+    []
   );
 
   const clearCanvas = React.useCallback((canvasId: string) => {
     setCanvases((prev) =>
-      prev.map((c) => (c.id === canvasId ? { ...c, components: [] } : c)),
+      prev.map((c) => (c.id === canvasId ? { ...c, components: [] } : c))
     );
   }, []);
 
@@ -164,12 +172,14 @@ export const ComponentsCanvas: React.FC<
   const renderComponent = (componentProps: CanvasComponentProps) => {
     const componentType = componentProps._componentType;
     const componentDef = components.find(
-      (comp: TamboComponent) => comp.name === componentType,
+      (comp: TamboComponent) => comp.name === componentType
     );
 
     if (!componentDef) {
       return (
-        <div key={componentProps.componentId}>Unknown component type: {componentType}</div>
+        <div key={componentProps.componentId}>
+          Unknown component type: {componentType}
+        </div>
       );
     }
 
@@ -182,7 +192,9 @@ export const ComponentsCanvas: React.FC<
     return (
       <div key={componentId} className="relative group">
         <button
-          onClick={() => canvasId && componentId && removeComponent(canvasId, componentId)}
+          onClick={() =>
+            canvasId && componentId && removeComponent(canvasId, componentId)
+          }
           className="absolute -top-2 -right-2 bg-background border border-border rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
           title="Remove"
         >
@@ -196,12 +208,12 @@ export const ComponentsCanvas: React.FC<
   const activeCanvas = canvases.find((c) => c.id === activeCanvasId);
 
   const handleCreateCanvas = React.useCallback(() => {
-    const name = prompt("Canvas name")?.trim();
-    if (!name) return;
     const id = generateId();
+    const newCanvasIndex = canvases.length + 1;
+    const name = `New Canvas ${newCanvasIndex}`;
     setCanvases((prev) => [...prev, { id, name, components: [] }]);
     setActiveCanvasId(id);
-  }, []);
+  }, [canvases]);
 
   const startRenameCanvas = React.useCallback(
     (id: string) => {
@@ -209,8 +221,9 @@ export const ComponentsCanvas: React.FC<
       if (!canvas) return;
       setEditingCanvasId(id);
       setEditingName(canvas.name);
+      setPendingDeleteCanvasId(null);
     },
-    [canvases],
+    [canvases]
   );
 
   const saveRenameCanvas = React.useCallback(() => {
@@ -218,36 +231,61 @@ export const ComponentsCanvas: React.FC<
     const name = editingName.trim();
     if (name) {
       setCanvases((prev) =>
-        prev.map((c) => (c.id === editingCanvasId ? { ...c, name } : c)),
+        prev.map((c) => (c.id === editingCanvasId ? { ...c, name } : c))
       );
     }
     setEditingCanvasId(null);
   }, [editingCanvasId, editingName]);
 
-  const handleDeleteCanvas = React.useCallback((id: string) => {
-    if (!confirm("Delete this canvas?")) return;
-    setCanvases((prev) => prev.filter((c) => c.id !== id));
-    setActiveCanvasId((prev) => {
-      if (prev === id) {
-        const remaining = canvases.filter((c) => c.id !== id);
-        return remaining[0]?.id || null;
+  const handleDeleteCanvas = React.useCallback(
+    (id: string) => {
+      if (pendingDeleteCanvasId === id) {
+        // Confirmed deletion, actually delete the canvas
+        setCanvases((prev) => prev.filter((c) => c.id !== id));
+        setActiveCanvasId((prev) => {
+          if (prev === id) {
+            const remaining = canvases.filter((c) => c.id !== id);
+            return remaining[0]?.id || null;
+          }
+          return prev;
+        });
+        setPendingDeleteCanvasId(null);
+      } else {
+        // First click, mark as pending deletion
+        setPendingDeleteCanvasId(id);
+        // Clear pending deletion after a timeout
+        setTimeout(() => {
+          setPendingDeleteCanvasId((current) =>
+            current === id ? null : current
+          );
+        }, 3000);
       }
-      return prev;
-    });
-  }, [canvases]);
+    },
+    [canvases, pendingDeleteCanvasId]
+  );
 
   return (
     <div
       onDrop={handleDrop}
       onDragOver={handleDragOver}
-      className={cn("w-full h-full flex flex-col border border-border", className)}
+      className={cn("w-full h-full flex flex-col relative", className)}
       {...props}
     >
-      <div className="flex items-center overflow-x-auto border-b border-border/50 p-2 gap-1">
+      <div
+        className={cn(
+          "flex items-center overflow-x-auto p-2 pr-10 gap-1",
+          "[&::-webkit-scrollbar]:w-[6px]",
+          "[&::-webkit-scrollbar-thumb]:bg-gray-300",
+          "[&::-webkit-scrollbar:horizontal]:h-[4px]"
+        )}
+      >
         {canvases.map((c) => (
           <div
             key={c.id}
-            onClick={() => setActiveCanvasId(c.id)}
+            onClick={() => {
+              setActiveCanvasId(c.id);
+              setPendingDeleteCanvasId(null);
+            }}
             className={cn(
               "px-3 py-1 text-sm cursor-pointer whitespace-nowrap flex items-center gap-1 border-b-2",
               activeCanvasId === c.id
@@ -292,35 +330,59 @@ export const ComponentsCanvas: React.FC<
                     e.stopPropagation();
                     handleDeleteCanvas(c.id);
                   }}
-                  className="ml-1 p-0.5 hover:text-foreground"
-                  title="Delete"
+                  className={cn(
+                    "ml-1 p-0.5 hover:text-foreground",
+                    pendingDeleteCanvasId === c.id &&
+                      "text-red-500 hover:text-red-600"
+                  )}
+                  title={
+                    pendingDeleteCanvasId === c.id ? "Confirm delete" : "Delete"
+                  }
                 >
-                  <TrashIcon className="h-3 w-3" />
+                  {pendingDeleteCanvasId === c.id ? (
+                    <CheckIcon className="h-3 w-3" />
+                  ) : (
+                    <TrashIcon className="h-3 w-3" />
+                  )}
                 </button>
               </>
             )}
           </div>
         ))}
+      </div>
+
+      <div className="absolute top-2 right-2">
         <button
           onClick={handleCreateCanvas}
-          className="ml-auto p-1 hover:text-foreground"
+          className="p-1 hover:text-foreground bg-background/80 backdrop-blur-sm rounded"
           title="New canvas"
         >
           <PlusIcon className="h-4 w-4" />
         </button>
+      </div>
+
+      <div className="absolute bottom-4 right-4">
         {activeCanvasId && (
           <button
             onClick={() => clearCanvas(activeCanvasId)}
-            className="p-1 hover:text-foreground"
+            className="px-3 py-1.5 border border-gray-200 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800 rounded-md shadow-sm flex items-center gap-1.5 text-sm"
             title="Clear canvas"
           >
             <XIcon className="h-4 w-4" />
+            <span>Clear Canvas</span>
           </button>
         )}
       </div>
 
-      <div className="flex-1 overflow-auto p-4">
-        {(!activeCanvas || activeCanvas.components.length === 0) ? (
+      <div
+        className={cn(
+          "flex-1 overflow-auto p-4",
+          "[&::-webkit-scrollbar]:w-[6px]",
+          "[&::-webkit-scrollbar-thumb]:bg-gray-300",
+          "[&::-webkit-scrollbar:horizontal]:h-[4px]"
+        )}
+      >
+        {!activeCanvas || activeCanvas.components.length === 0 ? (
           <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
             Drag components here
           </div>
