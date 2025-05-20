@@ -36,7 +36,7 @@ export default function Home() {
           <div className="bg-white px-8 py-4">
             <h2 className="text-xl font-semibold mb-4">How it works:</h2>
             <p className="text-gray-600 mb-4">
-              This is demo of how to build generative UI and MCP servers.
+              This is a demo of how to build generative UI and MCP servers.
             </p>
             <p className="text-gray-600 mb-4">
               Right now we only support clientside but server-side + auth is
