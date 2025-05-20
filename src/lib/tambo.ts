@@ -12,6 +12,7 @@ import { DataCard, dataCardSchema } from "@/components/ui/card-data";
 import { Graph, graphSchema } from "@/components/ui/graph";
 import type { TamboComponent } from "@tambo-ai/react";
 import { TamboTool } from "@tambo-ai/react";
+import { canvasTools } from "@/tools/canvas-tools";
 
 /**
  * tools
@@ -24,6 +25,7 @@ import { TamboTool } from "@tambo-ai/react";
 export const tools: TamboTool[] = [
   // Set the MCP tools https://localhost:3000/mcp-config
   // Add non MCP tools here
+  ...canvasTools,
 ];
 
 /**
