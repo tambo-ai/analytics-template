@@ -96,7 +96,7 @@ const ThreadContent = React.forwardRef<HTMLDivElement, ThreadContentProps>(
       <ThreadContentContext.Provider value={contextValue}>
         <div
           ref={ref}
-          className={cn(className)}
+          className={cn("w-full", className)}
           data-slot="thread-content-container"
           {...props}
         >
@@ -134,12 +134,13 @@ const ThreadContentMessages = React.forwardRef<
   return (
     <div
       ref={ref}
-      className={cn(className)}
+      className={cn("w-full", className)}
       data-slot="thread-content-messages"
       {...props}
     >
       {messages.map((message, index) => {
         const showLoading = isGenerating && index === messages.length - 1;
+        const isUserMessage = message.role !== "assistant";
 
         return (
           <div
@@ -151,7 +152,7 @@ const ThreadContentMessages = React.forwardRef<
             }
             className={cn(
               !isGenerating && "animate-in fade-in-0 slide-in-from-bottom-2",
-              "duration-200 ease-out"
+              "duration-200 ease-out w-full"
             )}
             style={
               !isGenerating ? { animationDelay: `${index * 40}ms` } : undefined
@@ -163,22 +164,26 @@ const ThreadContentMessages = React.forwardRef<
               message={message}
               variant={variant}
               isLoading={showLoading}
-              className={
-                message.role === "assistant"
-                  ? "flex justify-start"
-                  : "flex justify-end"
-              }
+              className={cn(
+                "w-full",
+                isUserMessage ? "flex justify-end" : "flex justify-start"
+              )}
             >
-              <div className="flex flex-col">
+              <div
+                className={cn(
+                  "flex flex-col",
+                  isUserMessage ? "max-w-3xl" : "w-full"
+                )}
+              >
                 <MessageContent
                   className={
                     message.role === "assistant"
-                      ? "text-primary font-sans"
-                      : "text-primary bg-container hover:bg-backdrop font-sans"
+                      ? "text-primary font-sans w-full"
+                      : "text-primary bg-container hover:bg-backdrop font-sans w-full"
                   }
                 />
                 {/* Rendered component area determines if the message is a canvas message */}
-                <MessageRenderedComponentArea />
+                <MessageRenderedComponentArea className="w-full" />
               </div>
             </Message>
           </div>

@@ -48,6 +48,8 @@ export interface MessageThreadFullProps
    * @example variant="compact"
    */
   variant?: VariantProps<typeof messageVariants>["variant"];
+  /** Optional array of message suggestions */
+  suggestions?: Suggestion[];
 }
 
 /**
@@ -56,12 +58,16 @@ export interface MessageThreadFullProps
 export const MessageThreadFull = React.forwardRef<
   HTMLDivElement,
   MessageThreadFullProps
->(({ className, contextKey, variant, ...props }, ref) => {
+>(({ className, contextKey, variant, suggestions, ...props }, ref) => {
   const { containerRef, historyPosition } = useThreadContainerContext();
   const mergedRef = useMergedRef<HTMLDivElement | null>(ref, containerRef);
 
   const threadHistorySidebar = (
-    <ThreadHistory contextKey={contextKey} position={historyPosition}>
+    <ThreadHistory
+      contextKey={contextKey}
+      position={historyPosition}
+      defaultCollapsed={true}
+    >
       <ThreadHistoryHeader />
       <ThreadHistoryNewButton />
       <ThreadHistorySearch />
@@ -69,24 +75,26 @@ export const MessageThreadFull = React.forwardRef<
     </ThreadHistory>
   );
 
-  const populationSuggestions: Suggestion[] = [
+  // Fallback default suggestions if none are provided
+  const defaultSuggestions: Suggestion[] = suggestions || [
     {
       id: "suggestion-1",
-      title: "Who is the new Pope?",
-      detailedSuggestion: "Who is the new Pope?",
-      messageId: "current-events-query",
+      title: "Sales performance",
+      detailedSuggestion: "Show me our sales performance for the last quarter",
+      messageId: "analytics-query",
     },
     {
       id: "suggestion-2",
-      title: "Iran-India conflict?",
-      detailedSuggestion: "What is the status of the Iran-India conflict?",
-      messageId: "current-events-query",
+      title: "User growth trends",
+      detailedSuggestion: "What are our user growth trends over the past year?",
+      messageId: "analytics-query",
     },
     {
       id: "suggestion-3",
-      title: "Latest on tariffs?",
-      detailedSuggestion: "Whats the latest news on tariffs?",
-      messageId: "economic-query",
+      title: "Revenue breakdown",
+      detailedSuggestion:
+        "Can you provide a breakdown of our revenue by product category?",
+      messageId: "analytics-query",
     },
   ];
 
@@ -119,7 +127,7 @@ export const MessageThreadFull = React.forwardRef<
         </div>
 
         {/* Message suggestions */}
-        <MessageSuggestions initialSuggestions={populationSuggestions}>
+        <MessageSuggestions initialSuggestions={defaultSuggestions}>
           <MessageSuggestionsList />
         </MessageSuggestions>
       </ThreadContainer>

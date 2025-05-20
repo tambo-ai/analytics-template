@@ -37,10 +37,6 @@ export const graphSchema = z.object({
     .boolean()
     .optional()
     .describe("Whether to show the legend (default: true)"),
-  variant: z
-    .enum(["default", "solid", "bordered"])
-    .optional()
-    .describe("Visual style variant of the graph"),
   size: z
     .enum(["default", "sm", "lg"])
     .optional()
@@ -70,6 +66,10 @@ export interface GraphProps
   _tambo_statusMessage?: string;
   /** Text to display as the completion status message */
   _tambo_completionStatusMessage?: string;
+  /** Flag indicating if the component is in the canvas */
+  _inCanvas?: boolean;
+  /** Unique identifier for the component in the canvas */
+  canvasId?: string;
 }
 
 const graphVariants = cva(
@@ -137,6 +137,8 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
       _tambo_completionStatusMessage,
       _tambo_statusMessage,
       _tambo_displayMessage = true,
+      _inCanvas,
+      canvasId,
       ...props
     },
     ref
@@ -162,6 +164,33 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
       Array.isArray(data.labels) &&
       Array.isArray(data.datasets);
 
+    const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+      const dragPayload = {
+        component: "Graph",
+        props: {
+          data,
+          title,
+          showLegend,
+          variant,
+          size,
+          _inCanvas,
+          canvasId,
+        },
+      };
+      try {
+        e.dataTransfer.setData("application/json", JSON.stringify(dragPayload));
+        // Allow the component to be moved instead of copied
+        e.dataTransfer.effectAllowed = "move";
+      } catch (err) {
+        console.error("Failed to set drag data", err);
+      }
+    };
+
+    const draggableProps =
+      dataIsValid && !(isLatestMessage && isGenerating)
+        ? { draggable: true, onDragStart: handleDragStart }
+        : {};
+
     // For non-latest messages, show the graph immediately if data is valid
     // For latest message, only show loading state while generating
     if (!dataIsValid || (isLatestMessage && isGenerating)) {
@@ -169,6 +198,7 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
         <div
           ref={ref}
           className={cn(graphVariants({ variant, size }), className)}
+          {...draggableProps}
           {...props}
         >
           <div className="p-4 h-full flex items-center justify-center">
@@ -403,26 +433,32 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
       return (
         <div
           ref={ref}
-          className={cn(graphVariants({ variant, size }), className)}
+          className={cn(
+            "border-flat rounded-lg bg-card shadow-sm p-2",
+            className
+          )}
+          {...draggableProps}
           {...props}
         >
-          <div className="p-4 h-full">
-            {title && (
-              <h3 className="text-lg font-medium mb-4 text-foreground">
-                {title}
-              </h3>
-            )}
-            <div className="w-full h-[calc(100%-2rem)]">
-              <RechartsCore.ResponsiveContainer width="100%" height="100%">
-                {renderChart()}
-              </RechartsCore.ResponsiveContainer>
-            </div>
-            {/* Optionally display completion message */}
-            {_tambo_displayMessage && _tambo_completionStatusMessage && (
-              <div className="text-xs text-muted-foreground text-center pt-2">
-                {_tambo_completionStatusMessage}
+          <div className={cn(graphVariants({ variant, size }))}>
+            <div className="p-4 h-full">
+              {title && (
+                <h3 className="text-lg font-medium mb-4 text-foreground">
+                  {title}
+                </h3>
+              )}
+              <div className="w-full h-[calc(100%-2rem)]">
+                <RechartsCore.ResponsiveContainer width="100%" height="100%">
+                  {renderChart()}
+                </RechartsCore.ResponsiveContainer>
               </div>
-            )}
+              {/* Optionally display completion message */}
+              {_tambo_displayMessage && _tambo_completionStatusMessage && (
+                <div className="text-xs text-muted-foreground text-center pt-2">
+                  {_tambo_completionStatusMessage}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       );
