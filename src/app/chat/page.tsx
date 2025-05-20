@@ -1,5 +1,6 @@
 "use client";
 import { MessageThreadFull } from "@/components/ui/message-thread-full";
+import { GraphCanvas } from "@/components/ui/graph-canvas";
 import { components } from "@/lib/tambo";
 import { TamboProvider } from "@tambo-ai/react";
 import { TamboMcpProvider } from "@tambo-ai/react/mcp";
@@ -36,8 +37,11 @@ export default function Home() {
         components={components}
       >
         <TamboMcpProvider mcpServers={mcpServers}>
-          <div className="flex-1 overflow-hidden">
-            <MessageThreadFull contextKey="tambo-template" />
+          <div className="flex h-full overflow-hidden">
+            <div className="flex-1 overflow-hidden">
+              <MessageThreadFull contextKey="tambo-template" />
+            </div>
+            <GraphCanvas className="hidden md:block" />
           </div>
         </TamboMcpProvider>
       </TamboProvider>

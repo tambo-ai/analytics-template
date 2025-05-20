@@ -155,12 +155,33 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
       generationStage !== "COMPLETE" &&
       generationStage !== "ERROR";
 
-    const dataIsValid =
+  const dataIsValid =
       data &&
       data.labels &&
       data.datasets &&
       Array.isArray(data.labels) &&
       Array.isArray(data.datasets);
+
+    const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
+      const dragPayload = {
+        component: "Graph",
+        props: { data, title, showLegend, variant, size },
+      };
+      try {
+        e.dataTransfer.setData(
+          "application/json",
+          JSON.stringify(dragPayload),
+        );
+        e.dataTransfer.effectAllowed = "copy";
+      } catch (err) {
+        console.error("Failed to set drag data", err);
+      }
+    };
+
+    const draggableProps =
+      dataIsValid && !(isLatestMessage && isGenerating)
+        ? { draggable: true, onDragStart: handleDragStart }
+        : {};
 
     // For non-latest messages, show the graph immediately if data is valid
     // For latest message, only show loading state while generating
@@ -169,6 +190,7 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
         <div
           ref={ref}
           className={cn(graphVariants({ variant, size }), className)}
+          {...draggableProps}
           {...props}
         >
           <div className="p-4 h-full flex items-center justify-center">
@@ -404,6 +426,7 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
         <div
           ref={ref}
           className={cn(graphVariants({ variant, size }), className)}
+          {...draggableProps}
           {...props}
         >
           <div className="p-4 h-full">
