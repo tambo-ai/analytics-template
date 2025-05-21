@@ -1,10 +1,10 @@
-
 import { TamboTool } from "@tambo-ai/react";
 import { z } from "zod";
 
+// Simple interfaces for our canvas data model
 interface CanvasComponent {
   componentId: string;
-  _componentType?: string;
+  _componentType: string;
   [key: string]: unknown;
 }
 
@@ -16,6 +16,7 @@ interface Canvas {
 
 const STORAGE_KEY = "tambo_canvases";
 
+// Storage functions
 function loadCanvases(): { canvases: Canvas[]; activeCanvasId?: string } {
   if (typeof localStorage === "undefined") return { canvases: [] };
   try {
@@ -23,7 +24,10 @@ function loadCanvases(): { canvases: Canvas[]; activeCanvasId?: string } {
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed.canvases)) {
-        return { canvases: parsed.canvases, activeCanvasId: parsed.activeCanvasId };
+        return {
+          canvases: parsed.canvases,
+          activeCanvasId: parsed.activeCanvasId,
+        };
       }
     }
   } catch (err) {
@@ -45,102 +49,92 @@ function saveCanvases(canvases: Canvas[], activeCanvasId?: string) {
 const generateId = () =>
   `id-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-/** Create a new canvas */
+// Create canvas tool
 export const createCanvasTool: TamboTool = {
   name: "createCanvas",
-  description: "Create a new canvas and return the id",
-  tool: (name?: string) => {
+  description: "Create a new canvas",
+  tool: (name: string) => {
     const { canvases, activeCanvasId } = loadCanvases();
     const id = generateId();
     const canvasName = name || `New Canvas ${canvases.length + 1}`;
     const newCanvas: Canvas = { id, name: canvasName, components: [] };
     const updated = [...canvases, newCanvas];
     saveCanvases(updated, activeCanvasId);
-    return newCanvas;
+    return {
+      success: true,
+      canvas: newCanvas,
+    };
   },
   toolSchema: z
     .function()
-    .args(z.string().optional())
+    .args(z.string())
     .returns(
       z.object({
-        id: z.string(),
-        name: z.string(),
-        components: z.array(z.any()),
-      }),
+        success: z.boolean(),
+        canvas: z.record(z.string(), z.unknown()),
+      })
     ),
 };
 
-/** Get all canvases */
+// Get canvases tool
 export const getCanvasesTool: TamboTool = {
   name: "getCanvases",
-  description: "Get the list of canvases",
+  description: "Get the list of all canvases",
   tool: () => {
     const { canvases } = loadCanvases();
-    return canvases;
-  },
-  toolSchema: z.function().args().returns(z.array(z.any())),
-};
-
-/** Update canvas name */
-export const updateCanvasTool: TamboTool = {
-  name: "updateCanvas",
-  description: "Update a canvas name given its id",
-  tool: (id: string, name: string) => {
-    const { canvases, activeCanvasId } = loadCanvases();
-    const updated = canvases.map((c) => (c.id === id ? { ...c, name } : c));
-    saveCanvases(updated, activeCanvasId);
-    return updated.find((c) => c.id === id) ?? null;
+    return {
+      success: true,
+      canvases: canvases,
+    };
   },
   toolSchema: z
     .function()
-    .args(z.string(), z.string())
-    .returns(z.any()),
+    .args()
+    .returns(
+      z.object({
+        success: z.boolean(),
+        canvases: z.array(z.record(z.string(), z.unknown())),
+      })
+    ),
 };
 
-/** Get components for a canvas */
+// Get canvas components tool
 export const getCanvasComponentsTool: TamboTool = {
   name: "getCanvasComponents",
-  description: "Get all components for a canvas",
+  description: "Get all components for a specific canvas",
   tool: (id: string) => {
     const { canvases } = loadCanvases();
-    return canvases.find((c) => c.id === id)?.components || [];
-  },
-  toolSchema: z.function().args(z.string()).returns(z.array(z.any())),
-};
+    const canvas = canvases.find((c) => c.id === id);
+    const components = canvas?.components || [];
 
-/** Update a component's props in a canvas */
-export const updateCanvasComponentTool: TamboTool = {
-  name: "updateCanvasComponent",
-  description: "Update component props in a canvas",
-  tool: (canvasId: string, componentId: string, props: Record<string, unknown>) => {
-    const { canvases, activeCanvasId } = loadCanvases();
-    const updated = canvases.map((c) => {
-      if (c.id !== canvasId) return c;
-      return {
-        ...c,
-        components: c.components.map((comp) =>
-          comp.componentId === componentId ? { ...comp, ...props } : comp,
-        ),
-      };
-    });
-    saveCanvases(updated, activeCanvasId);
-    return (
-      updated
-        .find((c) => c.id === canvasId)
-        ?.components.find((comp) => comp.componentId === componentId) || null
-    );
+    return {
+      success: true,
+      found: !!canvas,
+      components: components,
+    };
   },
   toolSchema: z
     .function()
-    .args(z.string(), z.string(), z.record(z.any()))
-    .returns(z.any()),
+    .args(z.string())
+    .returns(
+      z.object({
+        success: z.boolean(),
+        found: z.boolean(),
+        components: z.array(z.record(z.string(), z.unknown())),
+      })
+    ),
 };
 
+// TODO: Implement update tools that work correctly
+// The update tools need a way to:
+// 1. Pass component type dynamically
+// 2. Validate the props against the correct component schema
+// 3. Handle empty props objects correctly
+// Current implementation causes schema validation errors with Tambo
+
+// Export all tools
 export const canvasTools = [
   createCanvasTool,
   getCanvasesTool,
-  updateCanvasTool,
   getCanvasComponentsTool,
-  updateCanvasComponentTool,
 ];
-

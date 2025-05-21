@@ -1,7 +1,7 @@
 "use client";
 import { ComponentsCanvas } from "@/components/ui/components-canvas";
 import { MessageThreadFull } from "@/components/ui/message-thread-full";
-import { components } from "@/lib/tambo";
+import { components, tools } from "@/lib/tambo";
 import { Suggestion, TamboProvider } from "@tambo-ai/react";
 import { TamboMcpProvider } from "@tambo-ai/react/mcp";
 
@@ -58,6 +58,7 @@ export default function Home() {
       <TamboProvider
         apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
         components={components}
+        tools={tools}
       >
         <TamboMcpProvider mcpServers={mcpServers}>
           <div className="flex h-full overflow-hidden">
