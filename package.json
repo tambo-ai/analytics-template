@@ -23,7 +23,8 @@
     "react-markdown": "^10.1.0",
     "react-syntax-highlighter": "^15.6.1",
     "recharts": "^2.15.3",
-    "sanitize-html": "^2.14.0"
+    "sanitize-html": "^2.14.0",
+    "zustand": "^5.0.4"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
