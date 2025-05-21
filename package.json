@@ -24,6 +24,9 @@
     "react-syntax-highlighter": "^15.6.1",
     "recharts": "^2.15.3",
     "sanitize-html": "^2.14.0",
+    "@dnd-kit/core": "^7.0.0",
+    "@dnd-kit/sortable": "^7.0.0",
+    "@dnd-kit/utilities": "^7.0.0",
     "zustand": "^5.0.4"
   },
   "devDependencies": {

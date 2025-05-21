@@ -3,6 +3,19 @@
 import { CanvasComponent, useCanvasStore } from "@/lib/canvas-storage";
 import { components } from "@/lib/tambo";
 import { cn } from "@/lib/utils";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { TamboComponent } from "@tambo-ai/react";
 import {
   CheckIcon,
@@ -40,6 +53,8 @@ export const ComponentsCanvas: React.FC<
   >(null);
   const [editingName, setEditingName] = React.useState("");
 
+  const sensors = useSensors(useSensor(PointerSensor));
+
   // Set default canvas if none exists
   React.useEffect(() => {
     if (canvases.length === 0) {
@@ -71,31 +86,8 @@ export const ComponentsCanvas: React.FC<
           componentProps.componentId ||
           `id-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-        // Get drop position information from the event
-        const dropTarget = e.target as HTMLElement;
-        const dropRect = dropTarget.getBoundingClientRect();
-        const dropY = e.clientY - dropRect.top;
-        const dropRatio = dropY / dropRect.height;
-
         // If it's an existing component being reordered in the same canvas
         if (isMovingExisting && sourceCanvasId === activeCanvasId) {
-          // Get target canvas components
-          const canvas = canvases.find((c) => c.id === activeCanvasId);
-          if (!canvas) return;
-
-          // Determine drop index based on position
-          let targetIndex = Math.floor(dropRatio * canvas.components.length);
-
-          // Ensure index is valid
-          targetIndex = Math.max(
-            0,
-            Math.min(canvas.components.length - 1, targetIndex)
-          );
-
-          // Use store to reorder component
-          useCanvasStore
-            .getState()
-            .reorderComponent(activeCanvasId, componentId, targetIndex);
           return;
         }
 
@@ -195,25 +187,7 @@ export const ComponentsCanvas: React.FC<
       componentProps;
 
     return (
-      <div
-        key={componentId}
-        className="relative group"
-        draggable={true}
-        onDragStart={(e) => {
-          // Set drag data for internal reordering
-          const dragData = {
-            component: _componentType,
-            props: {
-              ...componentProps,
-              _inCanvas: true,
-              componentId,
-              canvasId,
-            },
-          };
-          e.dataTransfer.setData("application/json", JSON.stringify(dragData));
-          e.dataTransfer.effectAllowed = "move";
-        }}
-      >
+      <div className="relative group">
         <button
           onClick={() =>
             canvasId && componentId && removeComponent(canvasId, componentId)
@@ -227,6 +201,48 @@ export const ComponentsCanvas: React.FC<
       </div>
     );
   };
+
+  const SortableItem: React.FC<{ componentProps: CanvasComponentProps }> = ({
+    componentProps,
+  }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+    } = useSortable({ id: componentProps.componentId });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+    };
+
+    return (
+      <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+        {renderComponent(componentProps)}
+      </div>
+    );
+  };
+
+  const handleDragEnd = React.useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || !activeCanvasId) return;
+
+      if (active.id !== over.id) {
+        const overIndex = useCanvasStore
+          .getState()
+          .getComponents(activeCanvasId)
+          .findIndex((c) => c.componentId === over.id);
+        if (overIndex === -1) return;
+        useCanvasStore
+          .getState()
+          .reorderComponent(activeCanvasId, active.id as string, overIndex);
+      }
+    },
+    [activeCanvasId]
+  );
 
   const activeCanvas = canvases.find((c) => c.id === activeCanvasId);
 
@@ -353,9 +369,18 @@ export const ComponentsCanvas: React.FC<
             Drag components here
           </div>
         ) : (
-          <div className="grid gap-4">
-            {activeCanvas.components.map(renderComponent)}
-          </div>
+          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+            <SortableContext
+              items={activeCanvas.components.map((c) => c.componentId)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="grid gap-4">
+                {activeCanvas.components.map((c) => (
+                  <SortableItem key={c.componentId} componentProps={c} />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
     </div>
