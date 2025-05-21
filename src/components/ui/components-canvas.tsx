@@ -1,5 +1,6 @@
 "use client";
 
+import { CanvasComponent, useCanvasStore } from "@/lib/canvas-storage";
 import { components } from "@/lib/tambo";
 import { cn } from "@/lib/utils";
 import { TamboComponent } from "@tambo-ai/react";
@@ -12,35 +13,25 @@ import {
 } from "lucide-react";
 import * as React from "react";
 
-// Generate a unique ID for components or canvases
-const generateId = () =>
-  `id-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-
 // Define a generic component props interface that includes our canvas-specific props
-interface CanvasComponentProps {
-  _inCanvas?: boolean;
-  /** Unique id for this component */
-  componentId?: string;
-  /** Id of the canvas this component belongs to */
-  canvasId?: string;
-  _componentType?: string;
-  // Using Record instead of any for better type safety while maintaining flexibility
-  [key: string]: unknown;
-}
-
-interface Canvas {
-  id: string;
-  name: string;
-  components: CanvasComponentProps[];
-}
+type CanvasComponentProps = CanvasComponent;
 
 export const ComponentsCanvas: React.FC<
   React.HTMLAttributes<HTMLDivElement>
 > = ({ className, ...props }) => {
-  const [canvases, setCanvases] = React.useState<Canvas[]>([]);
-  const [activeCanvasId, setActiveCanvasId] = React.useState<string | null>(
-    null
-  );
+  const {
+    canvases,
+    activeCanvasId,
+    createCanvas,
+    updateCanvas,
+    removeCanvas,
+    setActiveCanvas,
+    clearCanvas,
+    removeComponent,
+    addComponent,
+    moveComponent,
+  } = useCanvasStore();
+
   const [editingCanvasId, setEditingCanvasId] = React.useState<string | null>(
     null
   );
@@ -49,93 +40,87 @@ export const ComponentsCanvas: React.FC<
   >(null);
   const [editingName, setEditingName] = React.useState("");
 
-  const STORAGE_KEY = "tambo_canvases";
-
+  // Set default canvas if none exists
   React.useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as {
-          canvases: Canvas[];
-          activeCanvasId?: string;
-        };
-        if (Array.isArray(parsed.canvases)) {
-          setCanvases(parsed.canvases);
-          setActiveCanvasId(
-            parsed.activeCanvasId || parsed.canvases[0]?.id || null
-          );
-          return;
-        }
-      }
-    } catch (err) {
-      console.error("Failed to load canvases", err);
+    if (canvases.length === 0) {
+      createCanvas("New Canvas 1");
+    } else if (!activeCanvasId && canvases.length > 0) {
+      setActiveCanvas(canvases[0].id);
     }
-
-    const defaultCanvas: Canvas = {
-      id: generateId(),
-      name: "New Canvas 1",
-      components: [],
-    };
-    setCanvases([defaultCanvas]);
-    setActiveCanvasId(defaultCanvas.id);
-  }, []);
-
-  React.useEffect(() => {
-    try {
-      const payload = JSON.stringify({ canvases, activeCanvasId });
-      localStorage.setItem(STORAGE_KEY, payload);
-    } catch (err) {
-      console.error("Failed to save canvases", err);
-    }
-  }, [canvases, activeCanvasId]);
+  }, [canvases, activeCanvasId, createCanvas, setActiveCanvas]);
 
   const handleDrop = React.useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       if (!activeCanvasId) return;
+
       const data = e.dataTransfer.getData("application/json");
       if (!data) return;
+
       try {
         const parsed = JSON.parse(data);
-        if (parsed.component && parsed.props) {
-          const componentProps = parsed.props as CanvasComponentProps;
+        if (!parsed.component || !parsed.props) return;
 
-          if (componentProps._inCanvas && componentProps.componentId) {
-            setCanvases((prev) =>
-              prev.map((c) => ({
-                ...c,
-                components: c.components.filter(
-                  (comp) => comp.componentId !== componentProps.componentId
-                ),
-              }))
-            );
-          }
+        const componentProps = parsed.props as CanvasComponentProps;
+        const isMovingExisting =
+          componentProps._inCanvas &&
+          componentProps.componentId &&
+          componentProps.canvasId;
+        const sourceCanvasId = componentProps.canvasId;
+        const componentId =
+          componentProps.componentId ||
+          `id-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-          setCanvases((prev) =>
-            prev.map((c) =>
-              c.id === activeCanvasId
-                ? {
-                    ...c,
-                    components: [
-                      ...c.components,
-                      {
-                        ...componentProps,
-                        _inCanvas: true,
-                        componentId: componentProps.componentId || generateId(),
-                        canvasId: activeCanvasId,
-                        _componentType: parsed.component,
-                      },
-                    ],
-                  }
-                : c
-            )
+        // Get drop position information from the event
+        const dropTarget = e.target as HTMLElement;
+        const dropRect = dropTarget.getBoundingClientRect();
+        const dropY = e.clientY - dropRect.top;
+        const dropRatio = dropY / dropRect.height;
+
+        // If it's an existing component being reordered in the same canvas
+        if (isMovingExisting && sourceCanvasId === activeCanvasId) {
+          // Get target canvas components
+          const canvas = canvases.find((c) => c.id === activeCanvasId);
+          if (!canvas) return;
+
+          // Determine drop index based on position
+          let targetIndex = Math.floor(dropRatio * canvas.components.length);
+
+          // Ensure index is valid
+          targetIndex = Math.max(
+            0,
+            Math.min(canvas.components.length - 1, targetIndex)
           );
+
+          // Use store to reorder component
+          useCanvasStore
+            .getState()
+            .reorderComponent(activeCanvasId, componentId, targetIndex);
+          return;
         }
+
+        // If moving component between different canvases
+        if (
+          isMovingExisting &&
+          sourceCanvasId &&
+          sourceCanvasId !== activeCanvasId
+        ) {
+          moveComponent(sourceCanvasId, activeCanvasId, componentId);
+          return;
+        }
+
+        // If it's a new component or was dragged from palette
+        addComponent(activeCanvasId, {
+          ...componentProps,
+          componentId,
+          _inCanvas: true,
+          _componentType: parsed.component,
+        });
       } catch (err) {
         console.error("Invalid drop data", err);
       }
     },
-    [activeCanvasId]
+    [activeCanvasId, addComponent, moveComponent, canvases]
   );
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -144,29 +129,49 @@ export const ComponentsCanvas: React.FC<
       e.dataTransfer.effectAllowed === "move" ? "move" : "copy";
   };
 
-  const removeComponent = React.useCallback(
-    (canvasId: string, componentId: string) => {
-      setCanvases((prev) =>
-        prev.map((c) =>
-          c.id === canvasId
-            ? {
-                ...c,
-                components: c.components.filter(
-                  (comp) => comp.componentId !== componentId
-                ),
-              }
-            : c
-        )
-      );
+  const handleCreateCanvas = React.useCallback(() => {
+    createCanvas();
+  }, [createCanvas]);
+
+  const startRenameCanvas = React.useCallback(
+    (id: string) => {
+      const canvas = canvases.find((c) => c.id === id);
+      if (!canvas) return;
+      setEditingCanvasId(id);
+      setEditingName(canvas.name);
+      setPendingDeleteCanvasId(null);
     },
-    []
+    [canvases]
   );
 
-  const clearCanvas = React.useCallback((canvasId: string) => {
-    setCanvases((prev) =>
-      prev.map((c) => (c.id === canvasId ? { ...c, components: [] } : c))
-    );
-  }, []);
+  const saveRenameCanvas = React.useCallback(() => {
+    if (!editingCanvasId) return;
+    const name = editingName.trim();
+    if (name) {
+      updateCanvas(editingCanvasId, name);
+    }
+    setEditingCanvasId(null);
+  }, [editingCanvasId, editingName, updateCanvas]);
+
+  const handleDeleteCanvas = React.useCallback(
+    (id: string) => {
+      if (pendingDeleteCanvasId === id) {
+        // Confirmed deletion, actually delete the canvas
+        removeCanvas(id);
+        setPendingDeleteCanvasId(null);
+      } else {
+        // First click, mark as pending deletion
+        setPendingDeleteCanvasId(id);
+        // Clear pending deletion after a timeout
+        setTimeout(() => {
+          setPendingDeleteCanvasId((current) =>
+            current === id ? null : current
+          );
+        }, 3000);
+      }
+    },
+    [pendingDeleteCanvasId, removeCanvas]
+  );
 
   // Find component definition from registry
   const renderComponent = (componentProps: CanvasComponentProps) => {
@@ -186,11 +191,29 @@ export const ComponentsCanvas: React.FC<
     const Component = componentDef.component;
     // Filter out our custom props that shouldn't be passed to the component
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { _componentType, componentId, canvasId, ...cleanProps } =
+    const { _componentType, componentId, canvasId, _inCanvas, ...cleanProps } =
       componentProps;
 
     return (
-      <div key={componentId} className="relative group">
+      <div
+        key={componentId}
+        className="relative group"
+        draggable={true}
+        onDragStart={(e) => {
+          // Set drag data for internal reordering
+          const dragData = {
+            component: _componentType,
+            props: {
+              ...componentProps,
+              _inCanvas: true,
+              componentId,
+              canvasId,
+            },
+          };
+          e.dataTransfer.setData("application/json", JSON.stringify(dragData));
+          e.dataTransfer.effectAllowed = "move";
+        }}
+      >
         <button
           onClick={() =>
             canvasId && componentId && removeComponent(canvasId, componentId)
@@ -206,63 +229,6 @@ export const ComponentsCanvas: React.FC<
   };
 
   const activeCanvas = canvases.find((c) => c.id === activeCanvasId);
-
-  const handleCreateCanvas = React.useCallback(() => {
-    const id = generateId();
-    const newCanvasIndex = canvases.length + 1;
-    const name = `New Canvas ${newCanvasIndex}`;
-    setCanvases((prev) => [...prev, { id, name, components: [] }]);
-    setActiveCanvasId(id);
-  }, [canvases]);
-
-  const startRenameCanvas = React.useCallback(
-    (id: string) => {
-      const canvas = canvases.find((c) => c.id === id);
-      if (!canvas) return;
-      setEditingCanvasId(id);
-      setEditingName(canvas.name);
-      setPendingDeleteCanvasId(null);
-    },
-    [canvases]
-  );
-
-  const saveRenameCanvas = React.useCallback(() => {
-    if (!editingCanvasId) return;
-    const name = editingName.trim();
-    if (name) {
-      setCanvases((prev) =>
-        prev.map((c) => (c.id === editingCanvasId ? { ...c, name } : c))
-      );
-    }
-    setEditingCanvasId(null);
-  }, [editingCanvasId, editingName]);
-
-  const handleDeleteCanvas = React.useCallback(
-    (id: string) => {
-      if (pendingDeleteCanvasId === id) {
-        // Confirmed deletion, actually delete the canvas
-        setCanvases((prev) => prev.filter((c) => c.id !== id));
-        setActiveCanvasId((prev) => {
-          if (prev === id) {
-            const remaining = canvases.filter((c) => c.id !== id);
-            return remaining[0]?.id || null;
-          }
-          return prev;
-        });
-        setPendingDeleteCanvasId(null);
-      } else {
-        // First click, mark as pending deletion
-        setPendingDeleteCanvasId(id);
-        // Clear pending deletion after a timeout
-        setTimeout(() => {
-          setPendingDeleteCanvasId((current) =>
-            current === id ? null : current
-          );
-        }, 3000);
-      }
-    },
-    [canvases, pendingDeleteCanvasId]
-  );
 
   return (
     <div
@@ -283,7 +249,7 @@ export const ComponentsCanvas: React.FC<
           <div
             key={c.id}
             onClick={() => {
-              setActiveCanvasId(c.id);
+              setActiveCanvas(c.id);
               setPendingDeleteCanvasId(null);
             }}
             className={cn(
@@ -364,7 +330,7 @@ export const ComponentsCanvas: React.FC<
       <div className="absolute bottom-4 right-4">
         {activeCanvasId && (
           <button
-            onClick={() => clearCanvas(activeCanvasId)}
+            onClick={() => activeCanvasId && clearCanvas(activeCanvasId)}
             className="px-3 py-1.5 border border-gray-200 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800 rounded-md shadow-sm flex items-center gap-1.5 text-sm"
             title="Clear canvas"
           >

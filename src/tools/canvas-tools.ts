@@ -1,65 +1,16 @@
+import { useCanvasStore } from "@/lib/canvas-storage";
 import { TamboTool } from "@tambo-ai/react";
 import { z } from "zod";
-
-// Simple interfaces for our canvas data model
-interface CanvasComponent {
-  componentId: string;
-  _componentType: string;
-  [key: string]: unknown;
-}
-
-interface Canvas {
-  id: string;
-  name: string;
-  components: CanvasComponent[];
-}
-
-const STORAGE_KEY = "tambo_canvases";
-
-// Storage functions
-function loadCanvases(): { canvases: Canvas[]; activeCanvasId?: string } {
-  if (typeof localStorage === "undefined") return { canvases: [] };
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed.canvases)) {
-        return {
-          canvases: parsed.canvases,
-          activeCanvasId: parsed.activeCanvasId,
-        };
-      }
-    }
-  } catch (err) {
-    console.error("Failed to load canvases", err);
-  }
-  return { canvases: [] };
-}
-
-function saveCanvases(canvases: Canvas[], activeCanvasId?: string) {
-  if (typeof localStorage === "undefined") return;
-  try {
-    const payload = JSON.stringify({ canvases, activeCanvasId });
-    localStorage.setItem(STORAGE_KEY, payload);
-  } catch (err) {
-    console.error("Failed to save canvases", err);
-  }
-}
-
-const generateId = () =>
-  `id-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
 // Create canvas tool
 export const createCanvasTool: TamboTool = {
   name: "createCanvas",
   description: "Create a new canvas",
   tool: (name: string) => {
-    const { canvases, activeCanvasId } = loadCanvases();
-    const id = generateId();
-    const canvasName = name || `New Canvas ${canvases.length + 1}`;
-    const newCanvas: Canvas = { id, name: canvasName, components: [] };
-    const updated = [...canvases, newCanvas];
-    saveCanvases(updated, activeCanvasId);
+    // Access the store directly to create a canvas
+    const store = useCanvasStore.getState();
+    const newCanvas = store.createCanvas(name);
+
     return {
       success: true,
       canvas: newCanvas,
@@ -81,7 +32,10 @@ export const getCanvasesTool: TamboTool = {
   name: "getCanvases",
   description: "Get the list of all canvases",
   tool: () => {
-    const { canvases } = loadCanvases();
+    // Access the store directly to get canvases
+    const store = useCanvasStore.getState();
+    const canvases = store.getCanvases();
+
     return {
       success: true,
       canvases: canvases,
@@ -103,9 +57,10 @@ export const getCanvasComponentsTool: TamboTool = {
   name: "getCanvasComponents",
   description: "Get all components for a specific canvas",
   tool: (id: string) => {
-    const { canvases } = loadCanvases();
-    const canvas = canvases.find((c) => c.id === id);
-    const components = canvas?.components || [];
+    // Access the store directly to get components
+    const store = useCanvasStore.getState();
+    const canvas = store.getCanvas(id);
+    const components = store.getComponents(id);
 
     return {
       success: true,
