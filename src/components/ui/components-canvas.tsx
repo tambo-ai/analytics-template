@@ -3,6 +3,19 @@
 import { CanvasComponent, useCanvasStore } from "@/lib/canvas-storage";
 import { components } from "@/lib/tambo";
 import { cn } from "@/lib/utils";
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { TamboComponent } from "@tambo-ai/react";
 import {
   CheckIcon,
@@ -40,14 +53,22 @@ export const ComponentsCanvas: React.FC<
   >(null);
   const [editingName, setEditingName] = React.useState("");
 
+  const sensors = useSensors(useSensor(PointerSensor));
+
   // Set default canvas if none exists
   React.useEffect(() => {
-    if (canvases.length === 0) {
+    // Check if localStorage already has canvases before creating a new one
+    const existingStore = localStorage.getItem("tambo-canvas-storage");
+    const hasExistingCanvases =
+      existingStore && JSON.parse(existingStore)?.state?.canvases?.length > 0;
+
+    // Only create a default canvas if we don't have any in storage
+    if (!hasExistingCanvases && canvases.length === 0) {
       createCanvas("New Canvas 1");
     } else if (!activeCanvasId && canvases.length > 0) {
       setActiveCanvas(canvases[0].id);
     }
-  }, [canvases, activeCanvasId, createCanvas, setActiveCanvas]);
+  }, []); // Only run once on first mount
 
   const handleDrop = React.useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
@@ -71,31 +92,8 @@ export const ComponentsCanvas: React.FC<
           componentProps.componentId ||
           `id-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-        // Get drop position information from the event
-        const dropTarget = e.target as HTMLElement;
-        const dropRect = dropTarget.getBoundingClientRect();
-        const dropY = e.clientY - dropRect.top;
-        const dropRatio = dropY / dropRect.height;
-
         // If it's an existing component being reordered in the same canvas
         if (isMovingExisting && sourceCanvasId === activeCanvasId) {
-          // Get target canvas components
-          const canvas = canvases.find((c) => c.id === activeCanvasId);
-          if (!canvas) return;
-
-          // Determine drop index based on position
-          let targetIndex = Math.floor(dropRatio * canvas.components.length);
-
-          // Ensure index is valid
-          targetIndex = Math.max(
-            0,
-            Math.min(canvas.components.length - 1, targetIndex)
-          );
-
-          // Use store to reorder component
-          useCanvasStore
-            .getState()
-            .reorderComponent(activeCanvasId, componentId, targetIndex);
           return;
         }
 
@@ -194,39 +192,68 @@ export const ComponentsCanvas: React.FC<
     const { _componentType, componentId, canvasId, _inCanvas, ...cleanProps } =
       componentProps;
 
+    return <Component {...cleanProps} />;
+  };
+
+  const SortableItem: React.FC<{ componentProps: CanvasComponentProps }> = ({
+    componentProps,
+  }) => {
+    const { attributes, listeners, setNodeRef, transform, transition } =
+      useSortable({ id: componentProps.componentId });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+    };
+
+    // Extract the necessary props for the delete button
+    const { canvasId, componentId } = componentProps;
+
     return (
-      <div
-        key={componentId}
-        className="relative group"
-        draggable={true}
-        onDragStart={(e) => {
-          // Set drag data for internal reordering
-          const dragData = {
-            component: _componentType,
-            props: {
-              ...componentProps,
-              _inCanvas: true,
-              componentId,
-              canvasId,
-            },
-          };
-          e.dataTransfer.setData("application/json", JSON.stringify(dragData));
-          e.dataTransfer.effectAllowed = "move";
-        }}
-      >
-        <button
-          onClick={() =>
-            canvasId && componentId && removeComponent(canvasId, componentId)
-          }
-          className="absolute -top-2 -right-2 bg-background border border-border rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-          title="Remove"
-        >
-          <XIcon className="h-3 w-3" />
-        </button>
-        <Component {...cleanProps} />
+      <div className="relative group">
+        {/* Delete button outside the sortable area */}
+        <div className="absolute -top-2 -right-2 z-50">
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (canvasId && componentId) {
+                removeComponent(canvasId, componentId);
+              }
+            }}
+            className="bg-background border border-border rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Remove"
+          >
+            <XIcon className="h-3 w-3" />
+          </button>
+        </div>
+
+        {/* Sortable content */}
+        <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+          {renderComponent(componentProps)}
+        </div>
       </div>
     );
   };
+
+  const handleDragEnd = React.useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || !activeCanvasId) return;
+
+      if (active.id !== over.id) {
+        const overIndex = useCanvasStore
+          .getState()
+          .getComponents(activeCanvasId)
+          .findIndex((c) => c.componentId === over.id);
+        if (overIndex === -1) return;
+        useCanvasStore
+          .getState()
+          .reorderComponent(activeCanvasId, active.id as string, overIndex);
+      }
+    },
+    [activeCanvasId]
+  );
 
   const activeCanvas = canvases.find((c) => c.id === activeCanvasId);
 
@@ -327,7 +354,7 @@ export const ComponentsCanvas: React.FC<
         </button>
       </div>
 
-      <div className="absolute bottom-4 right-4">
+      <div className="absolute bottom-4 right-4 z-50 bg-background rounded-md">
         {activeCanvasId && (
           <button
             onClick={() => activeCanvasId && clearCanvas(activeCanvasId)}
@@ -353,9 +380,18 @@ export const ComponentsCanvas: React.FC<
             Drag components here
           </div>
         ) : (
-          <div className="grid gap-4">
-            {activeCanvas.components.map(renderComponent)}
-          </div>
+          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+            <SortableContext
+              items={activeCanvas.components.map((c) => c.componentId)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="grid gap-4">
+                {activeCanvas.components.map((c) => (
+                  <SortableItem key={c.componentId} componentProps={c} />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
     </div>
