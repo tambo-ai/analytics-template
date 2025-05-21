@@ -5,15 +5,15 @@ import { components } from "@/lib/tambo";
 import { cn } from "@/lib/utils";
 import {
   DndContext,
+  DragEndEvent,
   PointerSensor,
   useSensor,
   useSensors,
-  DragEndEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
-  verticalListSortingStrategy,
   useSortable,
+  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { TamboComponent } from "@tambo-ai/react";
@@ -57,12 +57,18 @@ export const ComponentsCanvas: React.FC<
 
   // Set default canvas if none exists
   React.useEffect(() => {
-    if (canvases.length === 0) {
+    // Check if localStorage already has canvases before creating a new one
+    const existingStore = localStorage.getItem("tambo-canvas-storage");
+    const hasExistingCanvases =
+      existingStore && JSON.parse(existingStore)?.state?.canvases?.length > 0;
+
+    // Only create a default canvas if we don't have any in storage
+    if (!hasExistingCanvases && canvases.length === 0) {
       createCanvas("New Canvas 1");
     } else if (!activeCanvasId && canvases.length > 0) {
       setActiveCanvas(canvases[0].id);
     }
-  }, [canvases, activeCanvasId, createCanvas, setActiveCanvas]);
+  }, []); // Only run once on first mount
 
   const handleDrop = React.useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
@@ -186,41 +192,46 @@ export const ComponentsCanvas: React.FC<
     const { _componentType, componentId, canvasId, _inCanvas, ...cleanProps } =
       componentProps;
 
-    return (
-      <div className="relative group">
-        <button
-          onClick={() =>
-            canvasId && componentId && removeComponent(canvasId, componentId)
-          }
-          className="absolute -top-2 -right-2 bg-background border border-border rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-          title="Remove"
-        >
-          <XIcon className="h-3 w-3" />
-        </button>
-        <Component {...cleanProps} />
-      </div>
-    );
+    return <Component {...cleanProps} />;
   };
 
   const SortableItem: React.FC<{ componentProps: CanvasComponentProps }> = ({
     componentProps,
   }) => {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-    } = useSortable({ id: componentProps.componentId });
+    const { attributes, listeners, setNodeRef, transform, transition } =
+      useSortable({ id: componentProps.componentId });
 
     const style = {
       transform: CSS.Transform.toString(transform),
       transition,
     };
 
+    // Extract the necessary props for the delete button
+    const { canvasId, componentId } = componentProps;
+
     return (
-      <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-        {renderComponent(componentProps)}
+      <div className="relative group">
+        {/* Delete button outside the sortable area */}
+        <div className="absolute -top-2 -right-2 z-50">
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (canvasId && componentId) {
+                removeComponent(canvasId, componentId);
+              }
+            }}
+            className="bg-background border border-border rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+            title="Remove"
+          >
+            <XIcon className="h-3 w-3" />
+          </button>
+        </div>
+
+        {/* Sortable content */}
+        <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+          {renderComponent(componentProps)}
+        </div>
       </div>
     );
   };
@@ -343,7 +354,7 @@ export const ComponentsCanvas: React.FC<
         </button>
       </div>
 
-      <div className="absolute bottom-4 right-4">
+      <div className="absolute bottom-4 right-4 z-50 bg-background rounded-md">
         {activeCanvasId && (
           <button
             onClick={() => activeCanvasId && clearCanvas(activeCanvasId)}
