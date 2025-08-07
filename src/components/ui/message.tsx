@@ -1,13 +1,18 @@
 "use client";
 
-import { createMarkdownComponents } from "@/components/ui/markdownComponents";
+import { checkHasContent, getSafeContent } from "@/lib/thread-hooks";
 import { cn } from "@/lib/utils";
 import type { TamboThreadMessage } from "@tambo-ai/react";
+import { useTambo } from "@tambo-ai/react";
+import type TamboAI from "@tambo-ai/typescript-sdk";
 import { cva, type VariantProps } from "class-variance-authority";
-import { ExternalLink, Check, Loader2 } from "lucide-react";
+import stringify from "json-stringify-pretty-compact";
+import { Check, ChevronDown, ExternalLink, Loader2, X } from "lucide-react";
 import * as React from "react";
+import { useState } from "react";
 import ReactMarkdown from "react-markdown";
-import { getSafeContent, checkHasContent } from "@/lib/thread-hooks";
+import { createMarkdownComponents } from "@/components/ui/markdown-components";
+import { components } from "@/lib/tambo";
 
 /**
  * CSS variants for the message container
@@ -15,7 +20,7 @@ import { getSafeContent, checkHasContent } from "@/lib/thread-hooks";
  * @property {string} default - Default styling
  * @property {string} solid - Solid styling with shadow effects
  */
-const messageVariants = cva("flex mb-4", {
+const messageVariants = cva("flex", {
   variants: {
     variant: {
       default: "",
@@ -110,6 +115,10 @@ const Message = React.forwardRef<HTMLDivElement, MessageProps>(
       [role, variant, isLoading, message],
     );
 
+    // Don't render tool response messages as they're shown in tool call dropdowns
+    if (message.actionType === "tool_response") {
+      return null;
+    }
     return (
       <MessageContext.Provider value={contextValue}>
         <div
@@ -153,32 +162,6 @@ const LoadingIndicator: React.FC<React.HTMLAttributes<HTMLDivElement>> = ({
 LoadingIndicator.displayName = "LoadingIndicator";
 
 /**
- * Gets the appropriate status message for a tool call
- *
- * This function extracts and formats status messages for tool calls based on
- * the current loading state and available status information.
- *
- * @param {TamboThreadMessage} message - The thread message object containing tool call data
- * @param {boolean | undefined} isLoading - Whether the tool call is currently in progress
- * @returns {string | null} The formatted status message or null if not a tool call
- */
-function getToolStatusMessage(
-  message: TamboThreadMessage,
-  isLoading: boolean | undefined,
-) {
-  const isToolCall = message.actionType === "tool_call";
-  if (!isToolCall) return null;
-
-  const toolCallMessage = isLoading
-    ? `Calling ${message.toolCallRequest?.toolName ?? "tool"}`
-    : `Called ${message.toolCallRequest?.toolName ?? "tool"}`;
-  const toolStatusMessage = isLoading
-    ? message.component?.statusMessage
-    : message.component?.completionStatusMessage;
-  return toolStatusMessage ?? toolCallMessage;
-}
-
-/**
  * Props for the MessageContent component.
  * Extends standard HTMLDivElement attributes.
  */
@@ -192,6 +175,7 @@ export interface MessageContentProps
 
 /**
  * Displays the message content with optional markdown formatting.
+ * Only shows text content - tool calls are handled by ToolcallInfo component.
  * @component MessageContent
  */
 const MessageContent = React.forwardRef<HTMLDivElement, MessageContentProps>(
@@ -212,13 +196,12 @@ const MessageContent = React.forwardRef<HTMLDivElement, MessageContentProps>(
     );
 
     const showLoading = isLoading && !hasContent;
-    const toolStatusMessage = getToolStatusMessage(message, isLoading);
 
     return (
       <div
         ref={ref}
         className={cn(
-          "relative inline-block rounded-3xl px-4 py-2 text-[15px] leading-relaxed transition-all duration-200 font-medium max-w-full [&_p]:my-1 [&_ul]:-my-5 [&_ol]:-my-5",
+          "relative block rounded-3xl px-4 py-2 text-[15px] leading-relaxed transition-all duration-200 font-medium max-w-full [&_p]:py-1 [&_ul]:py-4 [&_ol]:py-4 [&_li]:list-item",
           className,
         )}
         data-slot="message-content"
@@ -226,14 +209,14 @@ const MessageContent = React.forwardRef<HTMLDivElement, MessageContentProps>(
       >
         {showLoading ? (
           <div
-            className="flex items-center justify-center h-4 py-1"
+            className="flex items-center justify-start h-4 py-1"
             data-slot="message-loading-indicator"
           >
             <LoadingIndicator />
           </div>
         ) : (
           <div
-            className="break-words whitespace-pre-wrap"
+            className={cn("break-words", !markdown && "whitespace-pre-wrap")}
             data-slot="message-content-text"
           >
             {!contentToRender ? (
@@ -249,16 +232,9 @@ const MessageContent = React.forwardRef<HTMLDivElement, MessageContentProps>(
             ) : (
               safeContent
             )}
-          </div>
-        )}
-        {toolStatusMessage && (
-          <div className="flex items-center gap-2 text-xs opacity-50 mt-2">
-            {isLoading ? (
-              <Loader2 className="w-3 h-3 text-muted-foreground text-bold animate-spin" />
-            ) : (
-              <Check className="w-3 h-3 text-bold text-green-500" />
+            {message.isCancelled && (
+              <span className="text-muted-foreground text-xs">cancelled</span>
             )}
-            <span>{toolStatusMessage}</span>
           </div>
         )}
       </div>
@@ -266,6 +242,181 @@ const MessageContent = React.forwardRef<HTMLDivElement, MessageContentProps>(
   },
 );
 MessageContent.displayName = "MessageContent";
+
+/**
+ * Props for the ToolcallInfo component.
+ * Extends standard HTMLDivElement attributes.
+ */
+export interface ToolcallInfoProps
+  extends Omit<React.HTMLAttributes<HTMLDivElement>, "content"> {
+  /** Optional flag to render response content as Markdown. Default is true. */
+  markdown?: boolean;
+}
+
+function getToolStatusMessage(
+  message: TamboThreadMessage,
+  isLoading: boolean | undefined,
+) {
+  const isToolCall = message.actionType === "tool_call";
+  if (!isToolCall) return null;
+
+  const toolCallMessage = isLoading
+    ? `Calling ${message.toolCallRequest?.toolName ?? "tool"}`
+    : `Called ${message.toolCallRequest?.toolName ?? "tool"}`;
+  const toolStatusMessage = isLoading
+    ? message.component?.statusMessage
+    : message.component?.completionStatusMessage;
+  return toolStatusMessage ?? toolCallMessage;
+}
+
+/**
+ * Displays tool call information in a collapsible dropdown.
+ * Shows tool name, parameters, and associated tool response.
+ * @component ToolcallInfo
+ */
+const ToolcallInfo = React.forwardRef<HTMLDivElement, ToolcallInfoProps>(
+  ({ className, ...props }, ref) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const { message, isLoading } = useMessageContext();
+    const { thread } = useTambo();
+    const toolDetailsId = React.useId();
+
+    const associatedToolResponse = React.useMemo(() => {
+      if (!thread?.messages) return null;
+      const currentMessageIndex = thread.messages.findIndex(
+        (m: TamboThreadMessage) => m.id === message.id,
+      );
+      if (currentMessageIndex === -1) return null;
+      for (let i = currentMessageIndex + 1; i < thread.messages.length; i++) {
+        const nextMessage = thread.messages[i];
+        if (nextMessage.actionType === "tool_response") {
+          return nextMessage;
+        }
+        if (nextMessage.actionType === "tool_call") {
+          break;
+        }
+      }
+      return null;
+    }, [message, thread?.messages]);
+
+    if (message.actionType !== "tool_call") {
+      return null;
+    }
+
+    const toolCallRequest: TamboAI.ToolCallRequest | undefined =
+      message.toolCallRequest ?? message.component?.toolCallRequest;
+    const hasToolError = message.error;
+
+    const toolStatusMessage = getToolStatusMessage(message, isLoading);
+
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          "flex flex-col items-start text-xs opacity-50",
+          className,
+        )}
+        data-slot="toolcall-info"
+        {...props}
+      >
+        <div className="flex flex-col w-full">
+          <button
+            type="button"
+            aria-expanded={isExpanded}
+            aria-controls={toolDetailsId}
+            onClick={() => setIsExpanded(!isExpanded)}
+            className={cn(
+              "flex items-center gap-1 cursor-pointer hover:bg-gray-100 rounded-md p-1 select-none w-fit",
+            )}
+          >
+            {hasToolError ? (
+              <X className="w-3 h-3 text-bold text-red-500" />
+            ) : isLoading ? (
+              <Loader2 className="w-3 h-3 text-muted-foreground text-bold animate-spin" />
+            ) : (
+              <Check className="w-3 h-3 text-bold text-green-500" />
+            )}
+            <span>{toolStatusMessage}</span>
+            <ChevronDown
+              className={cn(
+                "w-3 h-3 transition-transform duration-200",
+                !isExpanded && "-rotate-90",
+              )}
+            />
+          </button>
+          <div
+            id={toolDetailsId}
+            className={cn(
+              "flex flex-col gap-1 p-3 overflow-hidden transition-[max-height,opacity,padding] duration-300 w-full",
+              isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0 p-0",
+            )}
+          >
+            <span className="whitespace-pre-wrap">
+              tool: {toolCallRequest?.toolName}
+            </span>
+            <span className="whitespace-pre-wrap">
+              parameters:{"\n"}
+              {stringify(keyifyParameters(toolCallRequest?.parameters))}
+            </span>
+            {associatedToolResponse && (
+              <>
+                <span className="whitespace-pre-wrap">result:</span>
+                <div>
+                  {!associatedToolResponse.content ? (
+                    <span className="text-muted-foreground italic">
+                      Empty response
+                    </span>
+                  ) : (
+                    formatToolResult(associatedToolResponse.content)
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  },
+);
+
+ToolcallInfo.displayName = "ToolcallInfo";
+
+function keyifyParameters(
+  parameters: TamboAI.ToolCallRequest["parameters"] | undefined,
+) {
+  if (!parameters) return;
+  return Object.fromEntries(
+    parameters.map((p) => [p.parameterName, p.parameterValue]),
+  );
+}
+
+/**
+ * Helper function to detect if content is JSON and format it nicely
+ * @param content - The content to check and format
+ * @returns Formatted content or original content if not JSON
+ */
+function formatToolResult(
+  content: TamboThreadMessage["content"],
+): React.ReactNode {
+  if (!content) return content;
+
+  const safeContent = getSafeContent(content);
+  if (typeof safeContent !== "string") return safeContent;
+
+  // Try to parse as JSON
+  try {
+    const parsed = JSON.parse(safeContent);
+    return (
+      <pre className="bg-muted/50 rounded-md p-3 text-xs overflow-x-auto overflow-y-auto max-w-full max-h-64">
+        <code className="font-mono break-words whitespace-pre-wrap">
+          {JSON.stringify(parsed, null, 2)}
+        </code>
+      </pre>
+    );
+  } catch {
+    return safeContent;
+  }
+}
 
 /**
  * Props for the MessageRenderedComponentArea component.
@@ -306,14 +457,18 @@ const MessageRenderedComponentArea = React.forwardRef<
     };
   }, []);
 
-  if (!message.renderedComponent || role !== "assistant") {
+  if (
+    !message.renderedComponent ||
+    role !== "assistant" ||
+    message.isCancelled
+  ) {
     return null;
   }
 
   return (
     <div
       ref={ref}
-      className={cn("mt-2", className)}
+      className={cn(className)}
       data-slot="message-rendered-component-area"
       {...props}
     >
@@ -341,7 +496,62 @@ const MessageRenderedComponentArea = React.forwardRef<
             </button>
           </div>
         ) : (
-          <div className="w-full mt-4 px-2">{message.renderedComponent}</div>
+          <div 
+            className="w-full pt-2 px-2 cursor-move" 
+            draggable={true}
+            onDragStart={(e) => {
+              const wrapperElement = message.renderedComponent as React.ReactElement;
+              let componentType = 'unknown';
+              let componentProps = {};
+              
+              // Extract actual component from TamboMessageProvider wrapper
+              if (React.isValidElement(wrapperElement) && wrapperElement.props?.children) {
+                const actualComponent = wrapperElement.props.children as React.ReactElement;
+                
+                if (React.isValidElement(actualComponent)) {
+                  // Match component with Tambo registry
+                  const matchedComponent = components.find(comp => comp.component === actualComponent.type);
+                  if (matchedComponent) {
+                    componentType = matchedComponent.name;
+                  } else if (typeof actualComponent.type === 'function') {
+                    // Fallback: use function name and map to registry names
+                    const typeFunc = actualComponent.type as React.ComponentType<unknown>;
+                    const funcName = (typeFunc as React.ComponentType & {displayName?: string; name?: string}).displayName || 
+                                    (typeFunc as React.ComponentType & {displayName?: string; name?: string}).name || 
+                                    'unknown';
+                    
+                    // Map component names to registry names
+                    if (funcName === 'Graph') {
+                      componentType = 'Graph';
+                    } else if (funcName === 'DataCard') {
+                      componentType = 'DataCards';
+                    } else {
+                      componentType = funcName;
+                    }
+                  }
+                  
+                  // Extract component props
+                  if (actualComponent.props) {
+                    componentProps = { ...actualComponent.props };
+                  }
+                }
+              }
+              
+              const dragData = {
+                component: componentType,
+                props: {
+                  ...componentProps,
+                  componentId: `id-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                  _inCanvas: false,
+                  _componentType: componentType
+                },
+              };
+              e.dataTransfer.setData("application/json", JSON.stringify(dragData));
+              e.dataTransfer.effectAllowed = "copy";
+            }}
+          >
+            {message.renderedComponent}
+          </div>
         ))}
     </div>
   );
@@ -350,9 +560,10 @@ MessageRenderedComponentArea.displayName = "Message.RenderedComponentArea";
 
 // --- Exports ---
 export {
-  messageVariants,
+  LoadingIndicator,
   Message,
   MessageContent,
   MessageRenderedComponentArea,
-  LoadingIndicator,
+  messageVariants,
+  ToolcallInfo,
 };

@@ -23,20 +23,24 @@ export const graphDataSchema = z.object({
         label: z.string().describe("Label for the dataset"),
         data: z.array(z.number()).describe("Data points for the dataset"),
         color: z.string().optional().describe("Optional color for the dataset"),
-      })
+      }),
     )
     .describe("Data for the graph"),
 });
 
 export const graphSchema = z.object({
   data: graphDataSchema.describe(
-    "Data object containing chart configuration and values"
+    "Data object containing chart configuration and values",
   ),
   title: z.string().describe("Title for the chart"),
   showLegend: z
     .boolean()
     .optional()
     .describe("Whether to show the legend (default: true)"),
+  variant: z
+    .enum(["default", "solid", "bordered"])
+    .optional()
+    .describe("Visual style variant of the graph"),
   size: z
     .enum(["default", "sm", "lg"])
     .optional()
@@ -44,7 +48,7 @@ export const graphSchema = z.object({
 });
 
 // Define the base type from the Zod schema
-type GraphDataType = z.infer<typeof graphDataSchema>;
+export type GraphDataType = z.infer<typeof graphDataSchema>;
 
 // Extend the GraphProps with additional tambo properties
 export interface GraphProps
@@ -60,16 +64,6 @@ export interface GraphProps
   variant?: "default" | "solid" | "bordered";
   /** Size of the graph */
   size?: "default" | "sm" | "lg";
-  /** Whether to display the status and completion messages */
-  _tambo_displayMessage?: boolean;
-  /** Text to display as the status message */
-  _tambo_statusMessage?: string;
-  /** Text to display as the completion status message */
-  _tambo_completionStatusMessage?: string;
-  /** Flag indicating if the component is in the canvas */
-  _inCanvas?: boolean;
-  /** Unique identifier for the component in the canvas */
-  canvasId?: string;
 }
 
 const graphVariants = cva(
@@ -94,7 +88,7 @@ const graphVariants = cva(
       variant: "default",
       size: "default",
     },
-  }
+  },
 );
 
 const defaultColors = [
@@ -127,21 +121,8 @@ const defaultColors = [
  */
 export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
   (
-    {
-      className,
-      variant,
-      size,
-      data,
-      title,
-      showLegend = true,
-      _tambo_completionStatusMessage,
-      _tambo_statusMessage,
-      _tambo_displayMessage = true,
-      _inCanvas,
-      canvasId,
-      ...props
-    },
-    ref
+    { className, variant, size, data, title, showLegend = true, ...props },
+    ref,
   ) => {
     // Get thread state
     const { thread } = useTambo();
@@ -158,38 +139,10 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
       generationStage !== "ERROR";
 
     const dataIsValid =
-      data &&
-      data.labels &&
+      data?.labels &&
       data.datasets &&
       Array.isArray(data.labels) &&
       Array.isArray(data.datasets);
-
-    const handleDragStart = (e: React.DragEvent<HTMLDivElement>) => {
-      const dragPayload = {
-        component: "Graph",
-        props: {
-          data,
-          title,
-          showLegend,
-          variant,
-          size,
-          _inCanvas,
-          canvasId,
-        },
-      };
-      try {
-        e.dataTransfer.setData("application/json", JSON.stringify(dragPayload));
-        // Allow the component to be moved instead of copied
-        e.dataTransfer.effectAllowed = "move";
-      } catch (err) {
-        console.error("Failed to set drag data", err);
-      }
-    };
-
-    const draggableProps =
-      dataIsValid && !(isLatestMessage && isGenerating)
-        ? { draggable: true, onDragStart: handleDragStart }
-        : {};
 
     // For non-latest messages, show the graph immediately if data is valid
     // For latest message, only show loading state while generating
@@ -198,7 +151,6 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
         <div
           ref={ref}
           className={cn(graphVariants({ variant, size }), className)}
-          {...draggableProps}
           {...props}
         >
           <div className="p-4 h-full flex items-center justify-center">
@@ -208,10 +160,12 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
                 <span className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:-0.2s]"></span>
                 <span className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:-0.1s]"></span>
               </div>
-              {/* Use the specific status message if available, otherwise default */}
               <span className="text-sm">
-                {(_tambo_displayMessage && _tambo_statusMessage) ??
-                  "Streaming data..."}
+                {isGenerating
+                  ? "Streaming data..."
+                  : data
+                    ? "Data ready"
+                    : "Awaiting data"}
               </span>
             </div>
           </div>
@@ -228,7 +182,7 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
             !dataset.label ||
             !dataset.data ||
             !Array.isArray(dataset.data) ||
-            dataset.data.length !== data.labels.length
+            dataset.data.length !== data.labels.length,
         )
       ) {
         console.error("Invalid graph data structure (post-generation):", data);
@@ -244,9 +198,6 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
                 <p className="font-medium">Invalid Graph Data</p>
                 <p className="text-sm mt-1">
                   The final data structure is invalid.
-                  {_tambo_displayMessage &&
-                    _tambo_completionStatusMessage &&
-                    ` (${_tambo_completionStatusMessage})`}
                 </p>
               </div>
             </div>
@@ -258,7 +209,7 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
       const chartData = data.labels.map((label, index) => ({
         name: label,
         ...Object.fromEntries(
-          data.datasets.map((dataset) => [dataset.label, dataset.data[index]])
+          data.datasets.map((dataset) => [dataset.label, dataset.data[index]]),
         ),
       }));
 
@@ -284,35 +235,36 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
                 <RechartsCore.CartesianGrid
                   strokeDasharray="3 3"
                   vertical={false}
-                  stroke="hsl(var(--border))"
+                  stroke="var(--border)"
                 />
                 <RechartsCore.XAxis
                   dataKey="name"
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   axisLine={false}
                   tickLine={false}
                 />
                 <RechartsCore.YAxis
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   axisLine={false}
                   tickLine={false}
                 />
                 <RechartsCore.Tooltip
                   cursor={{
-                    fill: "hsl(var(--muted)/0.3)",
+                    fill: "var(--muted)",
+                    fillOpacity: 0.3,
                     radius: 4,
                   }}
                   contentStyle={{
-                    backgroundColor: "hsl(var(--background))",
-                    border: "1px solid hsl(var(--border))",
+                    backgroundColor: "var(--background)",
+                    border: "1px solid var(--border)",
                     borderRadius: "var(--radius)",
-                    color: "hsl(var(--foreground))",
+                    color: "var(--foreground)",
                   }}
                 />
                 {showLegend && (
                   <RechartsCore.Legend
                     wrapperStyle={{
-                      color: "hsl(var(--foreground))",
+                      color: "var(--foreground)",
                     }}
                   />
                 )}
@@ -336,36 +288,36 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
                 <RechartsCore.CartesianGrid
                   strokeDasharray="3 3"
                   vertical={false}
-                  stroke="hsl(var(--border))"
+                  stroke="var(--border)"
                 />
                 <RechartsCore.XAxis
                   dataKey="name"
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   axisLine={false}
                   tickLine={false}
                 />
                 <RechartsCore.YAxis
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   axisLine={false}
                   tickLine={false}
                 />
                 <RechartsCore.Tooltip
                   cursor={{
-                    stroke: "hsl(var(--muted))",
+                    stroke: "var(--muted)",
                     strokeWidth: 2,
                     strokeOpacity: 0.3,
                   }}
                   contentStyle={{
-                    backgroundColor: "hsl(var(--background))",
-                    border: "1px solid hsl(var(--border))",
+                    backgroundColor: "var(--background)",
+                    border: "1px solid var(--border)",
                     borderRadius: "var(--radius)",
-                    color: "hsl(var(--foreground))",
+                    color: "var(--foreground)",
                   }}
                 />
                 {showLegend && (
                   <RechartsCore.Legend
                     wrapperStyle={{
-                      color: "hsl(var(--foreground))",
+                      color: "var(--foreground)",
                     }}
                   />
                 )}
@@ -391,9 +343,7 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
                   data={data.datasets[0].data.map((value, index) => ({
                     name: data.labels[index],
                     value,
-                    fill:
-                      data.datasets[0].color ??
-                      defaultColors[index % defaultColors.length],
+                    fill: defaultColors[index % defaultColors.length],
                   }))}
                   dataKey="value"
                   nameKey="name"
@@ -405,23 +355,23 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
                 />
                 <RechartsCore.Tooltip
                   contentStyle={{
-                    backgroundColor: "hsl(var(--background))",
-                    border: "1px solid hsl(var(--border))",
+                    backgroundColor: "var(--background)",
+                    border: "1px solid var(--border)",
                     borderRadius: "var(--radius)",
-                    color: "hsl(var(--foreground))",
+                    color: "var(--foreground)",
                     boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
                   }}
                   itemStyle={{
-                    color: "hsl(var(--foreground))",
+                    color: "var(--foreground)",
                   }}
                   labelStyle={{
-                    color: "hsl(var(--foreground))",
+                    color: "var(--foreground)",
                   }}
                 />
                 {showLegend && (
                   <RechartsCore.Legend
                     wrapperStyle={{
-                      color: "hsl(var(--foreground))",
+                      color: "var(--foreground)",
                     }}
                   />
                 )}
@@ -433,31 +383,19 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
       return (
         <div
           ref={ref}
-          className={cn(
-            "border-flat rounded-lg bg-card shadow-sm p-2",
-            className
-          )}
-          {...draggableProps}
+          className={cn(graphVariants({ variant, size }), className)}
           {...props}
         >
-          <div className={cn(graphVariants({ variant, size }))}>
-            <div className="p-4 h-full">
-              {title && (
-                <h3 className="text-lg font-medium mb-4 text-foreground">
-                  {title}
-                </h3>
-              )}
-              <div className="w-full h-[calc(100%-2rem)]">
-                <RechartsCore.ResponsiveContainer width="100%" height="100%">
-                  {renderChart()}
-                </RechartsCore.ResponsiveContainer>
-              </div>
-              {/* Optionally display completion message */}
-              {_tambo_displayMessage && _tambo_completionStatusMessage && (
-                <div className="text-xs text-muted-foreground text-center pt-2">
-                  {_tambo_completionStatusMessage}
-                </div>
-              )}
+          <div className="p-4 h-full">
+            {title && (
+              <h3 className="text-lg font-medium mb-4 text-foreground">
+                {title}
+              </h3>
+            )}
+            <div className="w-full h-[calc(100%-2rem)]">
+              <RechartsCore.ResponsiveContainer width="100%" height="100%">
+                {renderChart()}
+              </RechartsCore.ResponsiveContainer>
             </div>
           </div>
         </div>
@@ -481,6 +419,6 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
         </div>
       );
     }
-  }
+  },
 );
 Graph.displayName = "Graph";

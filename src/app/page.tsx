@@ -15,7 +15,7 @@ export default function Home() {
               className="mb-4"
             />
           </a>
-          <h1 className="text-4xl text-center">tambo-ai chat template</h1>
+          <h1 className="text-4xl text-center">tambo analytics template</h1>
         </div>
 
         <div className="w-full space-y-8">
@@ -24,10 +24,10 @@ export default function Home() {
             <ApiKeyCheck>
               <div className="flex gap-4 flex-wrap">
                 <a
-                  href="/mcp-config"
+                  href="/chat"
                   className="px-6 py-3 rounded-md font-medium shadow-sm transition-colors text-lg mt-4 bg-[#7FFFC3] hover:bg-[#72e6b0] text-gray-800"
                 >
-                  Go to MCP Config →
+                  Go to Chat →
                 </a>
               </div>
             </ApiKeyCheck>
@@ -36,11 +36,10 @@ export default function Home() {
           <div className="bg-white px-8 py-4">
             <h2 className="text-xl font-semibold mb-4">How it works:</h2>
             <p className="text-gray-600 mb-4">
-              This is a demo of how to build generative UI and MCP servers.
+              This template demonstrates drag & drop analytics with AI-generated components.
             </p>
             <p className="text-gray-600 mb-4">
-              Right now we only support clientside but server-side + auth is
-              coming soon.
+              Ask the AI to create charts and data visualizations, then drag them onto the canvas for organization.
             </p>
             <div className="flex gap-4 flex-wrap mt-4">
               <a
@@ -50,14 +49,6 @@ export default function Home() {
                 className="px-6 py-3 rounded-md font-medium transition-colors text-lg mt-4 border border-gray-300 hover:bg-gray-50"
               >
                 View Docs
-              </a>
-              <a
-                href="https://smithery.ai/server/@mikechao/brave-search-mcp"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-6 py-3 rounded-md font-medium transition-colors text-lg mt-4 border border-gray-300 hover:bg-gray-50"
-              >
-                Get MCP Servers
               </a>
             </div>
           </div>
