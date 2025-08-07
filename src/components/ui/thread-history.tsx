@@ -1,18 +1,22 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   type TamboThread,
   useTamboThread,
   useTamboThreadList,
 } from "@tambo-ai/react";
 import {
-  PlusIcon,
-  SearchIcon,
   ArrowLeftToLine,
   ArrowRightToLine,
+  MoreHorizontal,
+  Pencil,
+  PlusIcon,
+  SearchIcon,
+  Sparkles,
 } from "lucide-react";
-import * as React from "react";
+import React, { useMemo } from "react";
 
 /**
  * Context for sharing thread history state and functions
@@ -32,6 +36,8 @@ interface ThreadHistoryContextValue {
   onThreadChange?: () => void;
   contextKey?: string;
   position?: "left" | "right";
+  updateThreadName: (newName: string, threadId?: string) => Promise<void>;
+  generateThreadName: (threadId: string) => Promise<TamboThread>;
 }
 
 const ThreadHistoryContext =
@@ -64,7 +70,7 @@ const ThreadHistory = React.forwardRef<HTMLDivElement, ThreadHistoryProps>(
       className,
       contextKey,
       onThreadChange,
-      defaultCollapsed = false,
+      defaultCollapsed = true,
       position = "left",
       children,
       ...props
@@ -86,6 +92,8 @@ const ThreadHistory = React.forwardRef<HTMLDivElement, ThreadHistoryProps>(
       switchCurrentThread,
       startNewThread,
       thread: currentThread,
+      updateThreadName,
+      generateThreadName,
     } = useTamboThread();
 
     // Update CSS variable when sidebar collapses/expands
@@ -120,6 +128,8 @@ const ThreadHistory = React.forwardRef<HTMLDivElement, ThreadHistoryProps>(
         onThreadChange,
         contextKey,
         position,
+        updateThreadName,
+        generateThreadName,
       }),
       [
         threads,
@@ -134,6 +144,8 @@ const ThreadHistory = React.forwardRef<HTMLDivElement, ThreadHistoryProps>(
         onThreadChange,
         contextKey,
         position,
+        updateThreadName,
+        generateThreadName,
       ],
     );
 
@@ -222,17 +234,20 @@ const ThreadHistoryNewButton = React.forwardRef<
   const { isCollapsed, startNewThread, refetch, onThreadChange } =
     useThreadHistoryContext();
 
-  const handleNewThread = React.useCallback(async (e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
+  const handleNewThread = React.useCallback(
+    async (e?: React.MouseEvent) => {
+      if (e) e.stopPropagation();
 
-    try {
-      await startNewThread();
-      await refetch();
-      onThreadChange?.();
-    } catch (error) {
-      console.error("Failed to create new thread:", error);
-    }
-  }, [startNewThread, refetch, onThreadChange]);
+      try {
+        await startNewThread();
+        await refetch();
+        onThreadChange?.();
+      } catch (error) {
+        console.error("Failed to create new thread:", error);
+      }
+    },
+    [startNewThread, refetch, onThreadChange],
+  );
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -338,15 +353,66 @@ const ThreadHistoryList = React.forwardRef<
     currentThread,
     switchCurrentThread,
     onThreadChange,
+    updateThreadName,
+    generateThreadName,
+    refetch,
   } = useThreadHistoryContext();
 
-  if (isCollapsed) return null;
+  const [editingThread, setEditingThread] = React.useState<TamboThread | null>(
+    null,
+  );
+  const [newName, setNewName] = React.useState("");
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // Handle click outside name editing input
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        editingThread &&
+        inputRef.current &&
+        !inputRef.current.contains(event.target as Node)
+      ) {
+        setEditingThread(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [editingThread]);
+
+  // Focus input when entering edit mode
+  React.useEffect(() => {
+    if (editingThread) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [editingThread]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setEditingThread(null);
+    }
+  };
 
   // Filter threads based on search query
-  const filteredThreads =
-    threads?.items?.filter((thread: TamboThread) =>
-      thread.id.toLowerCase().includes(searchQuery.toLowerCase()),
-    ) ?? [];
+  const filteredThreads = useMemo(() => {
+    // While collapsed we do not need the list, avoid extra work.
+    if (isCollapsed) return [];
+
+    if (!threads?.items) return [];
+
+    const query = searchQuery.toLowerCase();
+    return threads.items.filter((thread: TamboThread) => {
+      const nameMatches = thread.name?.toLowerCase().includes(query) ?? false;
+      const idMatches = thread.id.toLowerCase().includes(query);
+
+      return idMatches ? true : nameMatches;
+    });
+  }, [isCollapsed, threads, searchQuery]);
 
   const handleSwitchThread = async (threadId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -359,8 +425,37 @@ const ThreadHistoryList = React.forwardRef<
     }
   };
 
+  const handleRename = (thread: TamboThread) => {
+    setEditingThread(thread);
+    setNewName(thread.name ?? "");
+  };
+
+  const handleGenerateName = async (thread: TamboThread) => {
+    try {
+      await generateThreadName(thread.id);
+      await refetch();
+    } catch (error) {
+      console.error("Failed to generate name:", error);
+    }
+  };
+
+  const handleNameSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingThread) return;
+
+    try {
+      await updateThreadName(newName, editingThread.id);
+      await refetch();
+      setEditingThread(null);
+    } catch (error) {
+      console.error("Failed to rename thread:", error);
+    }
+  };
+
+  // Content to show
+  let content;
   if (isLoading) {
-    return (
+    content = (
       <div
         ref={ref}
         className={cn("text-sm text-muted-foreground p-2", className)}
@@ -369,10 +464,8 @@ const ThreadHistoryList = React.forwardRef<
         Loading threads...
       </div>
     );
-  }
-
-  if (error) {
-    return (
+  } else if (error) {
+    content = (
       <div
         ref={ref}
         className={cn("text-sm text-destructive p-2", className)}
@@ -381,10 +474,8 @@ const ThreadHistoryList = React.forwardRef<
         Error loading threads
       </div>
     );
-  }
-
-  if (filteredThreads.length === 0) {
-    return (
+  } else if (filteredThreads.length === 0) {
+    content = (
       <div
         ref={ref}
         className={cn("text-sm text-muted-foreground p-2", className)}
@@ -393,49 +484,148 @@ const ThreadHistoryList = React.forwardRef<
         {searchQuery ? "No matching threads" : "No previous threads"}
       </div>
     );
-  }
-
-  return (
-    <div
-      ref={ref}
-      className={cn("overflow-y-auto flex-1", className)}
-      {...props}
-    >
+  } else {
+    content = (
       <div className="space-y-1">
         {filteredThreads.map((thread: TamboThread) => (
           <div
             key={thread.id}
             onClick={async () => await handleSwitchThread(thread.id)}
             className={cn(
-              "p-2 rounded-md hover:bg-backdrop cursor-pointer",
+              "p-2 rounded-md hover:bg-backdrop cursor-pointer group flex items-center justify-between",
               currentThread?.id === thread.id ? "bg-muted" : "",
+              editingThread?.id === thread.id ? "bg-muted" : "",
             )}
           >
-            <div className="text-sm">
-              <span className="font-medium">
-                {`Thread ${thread.id.substring(0, 8)}`}
-              </span>
-              <p className="text-xs text-muted-foreground truncate mt-1">
-                {new Date(thread.createdAt).toLocaleString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
-              </p>
+            <div className="text-sm flex-1">
+              {editingThread?.id === thread.id ? (
+                <form
+                  onSubmit={handleNameSubmit}
+                  className="flex flex-col gap-1"
+                >
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="w-full bg-background px-1 text-sm font-medium focus:outline-none rounded-sm"
+                    onClick={(e) => e.stopPropagation()}
+                    placeholder="Thread name..."
+                  />
+                  <p className="text-xs text-muted-foreground truncate">
+                    {new Date(thread.createdAt).toLocaleString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </form>
+              ) : (
+                <>
+                  <span className="font-medium line-clamp-1">
+                    {thread.name ?? `Thread ${thread.id.substring(0, 8)}`}
+                  </span>
+                  <p className="text-xs text-muted-foreground truncate mt-1">
+                    {new Date(thread.createdAt).toLocaleString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </>
+              )}
             </div>
+            <ThreadOptionsDropdown
+              thread={thread}
+              onRename={handleRename}
+              onGenerateName={handleGenerateName}
+            />
           </div>
         ))}
       </div>
+    );
+  }
+
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "overflow-y-auto flex-1 transition-all duration-300 ease-in-out",
+        isCollapsed
+          ? "opacity-0 max-h-0 overflow-hidden pointer-events-none"
+          : "opacity-100 max-h-full pointer-events-auto",
+        className,
+      )}
+      {...props}
+    >
+      {content}
     </div>
   );
 });
 ThreadHistoryList.displayName = "ThreadHistory.List";
 
+/**
+ * Dropdown menu component for thread actions
+ */
+const ThreadOptionsDropdown = ({
+  thread,
+  onRename,
+  onGenerateName,
+}: {
+  thread: TamboThread;
+  onRename: (thread: TamboThread) => void;
+  onGenerateName: (thread: TamboThread) => void;
+}) => {
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger asChild>
+        <button
+          className="p-1 hover:bg-backdrop rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+        </button>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          className="min-w-[160px] text-xs bg-popover rounded-md p-1 shadow-md border border-border"
+          sideOffset={5}
+          align="end"
+        >
+          <DropdownMenu.Item
+            className="flex items-center gap-2 px-2 py-1.5 text-foreground hover:bg-backdrop rounded-sm cursor-pointer outline-none transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRename(thread);
+            }}
+          >
+            <Pencil className="h-3 w-3" />
+            Rename
+          </DropdownMenu.Item>
+          <DropdownMenu.Item
+            className="flex items-center gap-2 px-2 py-1.5 text-foreground hover:bg-backdrop rounded-sm cursor-pointer outline-none transition-colors"
+            onClick={(e) => {
+              e.stopPropagation();
+              onGenerateName(thread);
+            }}
+          >
+            <Sparkles className="h-3 w-3" />
+            Generate Name
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+};
+
 export {
   ThreadHistory,
   ThreadHistoryHeader,
+  ThreadHistoryList,
   ThreadHistoryNewButton,
   ThreadHistorySearch,
-  ThreadHistoryList,
+  ThreadOptionsDropdown,
 };

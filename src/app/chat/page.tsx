@@ -22,13 +22,7 @@ export type MCPServerConfig =
 
 export default function Home() {
   // Load MCP server configurations
-  const mcpServers: MCPServerConfig[] = [
-    {
-      name: "federal-reserve-api",
-      url: process.env.NEXT_PUBLIC_FRED_SMITHERY_AI_URL!,
-      transport: MCPTransport.HTTP,
-    },
-  ];
+  const mcpServers: MCPServerConfig[] = [];
 
   // Define default suggestions for the chat
   const defaultSuggestions: Suggestion[] = [

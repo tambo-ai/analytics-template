@@ -68,6 +68,7 @@ export const ComponentsCanvas: React.FC<
     } else if (!activeCanvasId && canvases.length > 0) {
       setActiveCanvas(canvases[0].id);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on first mount
 
   const handleDrop = React.useCallback(
@@ -92,12 +93,12 @@ export const ComponentsCanvas: React.FC<
           componentProps.componentId ||
           `id-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
-        // If it's an existing component being reordered in the same canvas
+        // Skip if reordering within the same canvas (handled by dnd-kit)
         if (isMovingExisting && sourceCanvasId === activeCanvasId) {
           return;
         }
 
-        // If moving component between different canvases
+        // Move component between different canvases
         if (
           isMovingExisting &&
           sourceCanvasId &&
@@ -107,7 +108,7 @@ export const ComponentsCanvas: React.FC<
           return;
         }
 
-        // If it's a new component or was dragged from palette
+        // Add new component to canvas
         addComponent(activeCanvasId, {
           ...componentProps,
           componentId,
@@ -118,7 +119,7 @@ export const ComponentsCanvas: React.FC<
         console.error("Invalid drop data", err);
       }
     },
-    [activeCanvasId, addComponent, moveComponent, canvases]
+    [activeCanvasId, addComponent, moveComponent]
   );
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -207,7 +208,7 @@ export const ComponentsCanvas: React.FC<
     };
 
     // Extract the necessary props for the delete button
-    const { canvasId, componentId } = componentProps;
+    const { canvasId, componentId, _componentType } = componentProps;
 
     return (
       <div className="relative group">
@@ -228,8 +229,29 @@ export const ComponentsCanvas: React.FC<
           </button>
         </div>
 
-        {/* Sortable content */}
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+        {/* Sortable content - make it draggable to other canvases */}
+        <div 
+          ref={setNodeRef} 
+          style={style} 
+          {...attributes} 
+          {...listeners}
+          draggable={true}
+          onDragStart={(e) => {
+            // Set drag data for moving between canvases
+            const dragData = {
+              component: _componentType,
+              props: {
+                ...componentProps,
+                _inCanvas: true,
+                componentId,
+                canvasId,
+              },
+            };
+            e.dataTransfer.setData("application/json", JSON.stringify(dragData));
+            e.dataTransfer.effectAllowed = "move";
+          }}
+          className="cursor-move"
+        >
           {renderComponent(componentProps)}
         </div>
       </div>
