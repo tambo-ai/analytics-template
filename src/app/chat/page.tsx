@@ -1,18 +1,20 @@
 "use client";
-import { InteractableDashboard } from "@/components/ui/interactable-dashboard";
+import ComponentsCanvas from "@/components/ui/components-canvas";
+import { InteractableCanvasDetails } from "@/components/ui/interactable-canvas-details";
+import { InteractableTabs } from "@/components/ui/interactable-tabs";
 import { MessageThreadFull } from "@/components/ui/message-thread-full";
 import { components, tools } from "@/lib/tambo";
 import { TamboProvider } from "@tambo-ai/react";
 import { TamboMcpProvider } from "@tambo-ai/react/mcp";
 
 // Define MCP transport types
-export enum MCPTransport {
+enum MCPTransport {
   SSE = "sse",
   HTTP = "http",
 }
 
 // Define MCP server configuration types
-export type MCPServerConfig =
+type MCPServerConfig =
   | string
   | {
       url: string;
@@ -39,10 +41,14 @@ export default function Home() {
               <MessageThreadFull contextKey="tambo-template" />
             </div>
             <div className="hidden md:block w-[60%] overflow-auto">
-              <InteractableDashboard
-                interactableId="Dashboard"
-                className="h-full"
-              />
+              {/* Tabs interactable manages tabs state only */}
+              <InteractableTabs interactableId="Tabs" />
+
+              {/* Canvas details for active tab charts */}
+              <InteractableCanvasDetails interactableId="CanvasDetails" />
+
+              {/* Visual canvas renderer for the active tab */}
+              <ComponentsCanvas className="h-full" />
             </div>
           </div>
         </TamboMcpProvider>

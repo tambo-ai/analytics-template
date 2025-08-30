@@ -1,85 +1,101 @@
 "use client";
 
-import { ComponentsCanvas } from "@/components/ui/components-canvas";
+import type { Canvas, CanvasComponent } from "@/lib/canvas-storage";
 import { useCanvasStore } from "@/lib/canvas-storage";
 import { useTamboInteractable, withInteractable } from "@tambo-ai/react";
 import { useEffect, useRef } from "react";
 import { z } from "zod";
 
-// Interactable: Dashboard wrapper using state-in/state-out model
-// Docs: https://docs.tambo.co/concepts/components/interactable-components
+// Interactable: Tabs-only manager (ids, names, activeCanvasId)
 
-const canvasSchema = z.object({
+const tabSchema = z.object({
   id: z.string(),
   name: z.string(),
-  components: z.array(z.any()),
 });
 
-const dashboardPropsSchema = z.object({
+const tabsPropsSchema = z.object({
   className: z.string().optional(),
   state: z
     .object({
-      canvases: z.array(canvasSchema),
+      canvases: z.array(tabSchema),
       activeCanvasId: z.string().nullable().optional(),
     })
     .optional(),
-  version: z.number().optional(),
 });
 
-type DashboardProps = z.infer<typeof dashboardPropsSchema> & {
+type TabsProps = z.infer<typeof tabsPropsSchema> & {
   onPropsUpdate?: (newProps: Record<string, unknown>) => void;
   interactableId?: string;
-  onInteractableReady?: (id: string) => void;
 };
 
-function DashboardWrapper(props: DashboardProps) {
-  const { className, state, onPropsUpdate, version, interactableId } = props;
+function TabsWrapper(props: TabsProps) {
+  const { className, state, onPropsUpdate, interactableId } = props;
   const { updateInteractableComponentProps, interactableComponents } =
     useTamboInteractable();
 
-  // Guard against feedback loops while applying inbound props
   const applyingRef = useRef(false);
   const lastEmittedKeyRef = useRef("");
-  const lastAppliedVersionRef = useRef<number | undefined>(undefined);
 
-  // Inbound: when props.state changes, reconcile Zustand store
+  // Inbound: reconcile tabs only (ids, names, order, add/remove) and activeCanvasId
   useEffect(() => {
     if (!state) return;
-    if (version !== undefined && lastAppliedVersionRef.current === version) {
-      return;
-    }
     applyingRef.current = true;
-    // Ensure activeCanvasId is valid
-    const incomingCanvases = state.canvases || [];
+
+    const incomingTabs = state.canvases || [];
     const incomingActive = state.activeCanvasId ?? null;
-    const validActive = incomingCanvases.some((c) => c.id === incomingActive)
+
+    // Build new canvases array preserving existing components by id
+    const { canvases: currentCanvases } = useCanvasStore.getState();
+    const idToCanvas = new Map(currentCanvases.map((c) => [c.id, c] as const));
+
+    const nextCanvases = incomingTabs.map((t) => {
+      const existing = idToCanvas.get(t.id);
+      if (existing) {
+        return { ...existing, name: t.name };
+      }
+      return {
+        id: t.id,
+        name: t.name,
+        components: [] as CanvasComponent[],
+      } as Canvas;
+    });
+
+    const validActive = nextCanvases.some((c) => c.id === incomingActive)
       ? incomingActive
-      : incomingCanvases[0]?.id || null;
+      : nextCanvases[0]?.id || null;
+
     useCanvasStore.setState({
-      canvases: incomingCanvases,
+      canvases: nextCanvases as Canvas[],
       activeCanvasId: validActive,
     });
-    lastAppliedVersionRef.current = version;
-    // allow subscribers to run before we clear the flag
+
     setTimeout(() => {
       applyingRef.current = false;
     }, 0);
-  }, [state, version]);
+  }, [state]);
 
-  // Outbound: when local store changes (user edits), push state up via onPropsUpdate
+  // Outbound: emit tabs slice (ids, names) and activeCanvasId
   useEffect(() => {
     const unsubscribe = useCanvasStore.subscribe((s) => {
       if (applyingRef.current) return;
-      const nextState = {
-        canvases: s.canvases,
+      const payload = {
+        canvases: s.canvases.map((c) => ({ id: c.id, name: c.name })),
         activeCanvasId: s.activeCanvasId,
       };
-      const key = JSON.stringify(nextState);
+      const key = JSON.stringify(payload);
       if (key === lastEmittedKeyRef.current) return;
       lastEmittedKeyRef.current = key;
-      onPropsUpdate?.({ state: nextState, className });
+      onPropsUpdate?.({ state: payload, className });
       if (interactableId) {
-        updateInteractableComponentProps(interactableId, { state: nextState });
+        const match = interactableComponents.find(
+          (c) => c.props?.interactableId === interactableId
+        );
+        if (match) {
+          updateInteractableComponentProps(match.id, {
+            state: payload,
+            className,
+          });
+        }
       }
     });
     return () => unsubscribe();
@@ -88,13 +104,14 @@ function DashboardWrapper(props: DashboardProps) {
     updateInteractableComponentProps,
     interactableId,
     className,
+    interactableComponents,
   ]);
 
-  // Emit initial state once on mount so the model has a baseline
+  // Initial publish
   useEffect(() => {
     const s = useCanvasStore.getState();
     const initial = {
-      canvases: s.canvases,
+      canvases: s.canvases.map((c) => ({ id: c.id, name: c.name })),
       activeCanvasId: s.activeCanvasId,
     };
     const key = JSON.stringify(initial);
@@ -106,7 +123,7 @@ function DashboardWrapper(props: DashboardProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [className, interactableId, updateInteractableComponentProps]);
 
-  // If we don't know the runtime id, resolve it by matching interactableId prop
+  // Resolve runtime id and publish snapshot
   useEffect(() => {
     if (!interactableId) return;
     const match = interactableComponents.find(
@@ -115,14 +132,13 @@ function DashboardWrapper(props: DashboardProps) {
     if (!match) return;
     const s = useCanvasStore.getState();
     const snapshot = {
-      canvases: s.canvases,
+      canvases: s.canvases.map((c) => ({ id: c.id, name: c.name })),
       activeCanvasId: s.activeCanvasId,
     };
     updateInteractableComponentProps(match.id, {
       state: snapshot,
       className,
     });
-    // Also mark emitted key so subsequent store subscriptions don't immediately re-emit identical payload
     lastEmittedKeyRef.current = JSON.stringify(snapshot);
   }, [
     interactableComponents,
@@ -131,12 +147,13 @@ function DashboardWrapper(props: DashboardProps) {
     className,
   ]);
 
-  return <ComponentsCanvas className={className} />;
+  // No visual UI required; tabs UI remains in page via ComponentsCanvas
+  return <div className={className} aria-hidden />;
 }
 
-export const InteractableDashboard = withInteractable(DashboardWrapper, {
-  componentName: "Dashboard",
+export const InteractableTabs = withInteractable(TabsWrapper, {
+  componentName: "Tabs",
   description:
-    "Dashboard showing canvases and components. Accepts full state via props and emits updates when users edit.",
-  propsSchema: dashboardPropsSchema,
+    "Tabs-only interactable. Manages canvases (id, name) and activeCanvasId. Use CanvasDetails to edit charts for the selected tab.",
+  propsSchema: tabsPropsSchema,
 });

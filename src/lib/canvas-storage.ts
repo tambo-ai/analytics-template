@@ -86,7 +86,7 @@ export const useCanvasStore = create<CanvasState>()(
 
         set((state) => ({
           canvases: [...state.canvases, newCanvas],
-          activeCanvasId: state.activeCanvasId || id,
+          activeCanvasId: id,
         }));
 
         return newCanvas;
@@ -140,12 +140,17 @@ export const useCanvasStore = create<CanvasState>()(
       // Reorder canvases (tabs) by moving the specified canvasId to newIndex
       reorderCanvas: (canvasId: string, newIndex: number) => {
         set((state) => {
-          const currentIndex = state.canvases.findIndex((c) => c.id === canvasId);
+          const currentIndex = state.canvases.findIndex(
+            (c) => c.id === canvasId
+          );
           if (currentIndex === -1) return state;
 
           const canvasesCopy = [...state.canvases];
           const [moving] = canvasesCopy.splice(currentIndex, 1);
-          const boundedIndex = Math.max(0, Math.min(canvasesCopy.length, newIndex));
+          const boundedIndex = Math.max(
+            0,
+            Math.min(canvasesCopy.length, newIndex)
+          );
           canvasesCopy.splice(boundedIndex, 0, moving);
 
           return { canvases: canvasesCopy };
