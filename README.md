@@ -24,9 +24,13 @@ Generate graphs with natural language and use natural language to interact with 
 
 4. `npx tambo init`
 
-- or rename `example.env.local` to `.env.local` and add your tambo API key you can get for free [here](https://tambo.co/dashboard), tambo also supports self-hosting.
+   - or rename `example.env.local` to `.env.local` and set:
 
-4. Run `npm run dev` and go to `localhost:3000` to use the app!
+     ```env
+     NEXT_PUBLIC_TAMBO_API_KEY=your-api-key
+     ```
+
+5. Run `npm run dev` and go to `localhost:3000` to use the app!
 
 ## Roadmap
 
@@ -43,7 +47,7 @@ Generate graphs with natural language and use natural language to interact with 
 
 - **Component registration and chat wiring**: See `src/lib/tambo.ts` and `src/app/chat/page.tsx`.
 
-- **Generatable components (created by chat)**: Components the AI can instantiate in the thread, e.g. `src/components/ui/graph.tsx`, registered in `src/lib/tambo.ts`.
+- **Generatable components (created by chat)**: Components the AI can instantiate in the thread, e.g. `src/components/tambo/graph.tsx`, registered in `src/lib/tambo.ts`.
 
 - **Editable/readable components (stateful UI the chat can modify or inspect)**:
   - Canvas state in `src/lib/canvas-storage.ts` (Zustand) with canvases and items.
@@ -58,7 +62,7 @@ Register components the AI can render, with schemas for safe props:
 
 ```tsx
 // src/lib/tambo.ts (excerpt)
-import { Graph, graphSchema } from "@/components/ui/graph";
+import { Graph, graphSchema } from "@/components/tambo/graph";
 import { DataCard, dataCardSchema } from "@/components/ui/card-data";
 import type { TamboComponent } from "@tambo-ai/react";
 
@@ -84,27 +88,32 @@ Wire the chat and the editable canvas UI:
 // src/app/chat/page.tsx (excerpt)
 "use client";
 import { TamboProvider } from "@tambo-ai/react";
-import { MessageThreadFull } from "@/components/ui/message-thread-full";
+import { MessageThreadFull } from "@/components/tambo/message-thread-full";
 import ComponentsCanvas from "@/components/ui/components-canvas";
 import { InteractableTabs } from "@/components/ui/interactable-tabs";
 import { InteractableCanvasDetails } from "@/components/ui/interactable-canvas-details";
 import { components, tools } from "@/lib/tambo";
+import { useMcpServers } from "@/components/tambo/mcp-config-modal";
+import { TamboMcpProvider } from "@tambo-ai/react/mcp";
 
 export default function Chat() {
+  const mcpServers = useMcpServers();
   return (
     <TamboProvider
       apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
       components={components}
       tools={tools}
     >
-      <div className="flex h-full">
-        <MessageThreadFull contextKey="tambo-template" />
-        <div className="hidden md:block w-[60%]">
-          <InteractableTabs interactableId="Tabs" />
-          <InteractableCanvasDetails interactableId="CanvasDetails" />
-          <ComponentsCanvas className="h-full" />
+      <TamboMcpProvider mcpServers={mcpServers}>
+        <div className="flex h-full">
+          <MessageThreadFull contextKey="tambo-template" />
+          <div className="hidden md:block w-[60%]">
+            <InteractableTabs interactableId="Tabs" />
+            <InteractableCanvasDetails interactableId="CanvasDetails" />
+            <ComponentsCanvas className="h-full" />
+          </div>
         </div>
-      </div>
+      </TamboMcpProvider>
     </TamboProvider>
   );
 }

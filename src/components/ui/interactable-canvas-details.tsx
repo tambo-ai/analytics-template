@@ -65,20 +65,20 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
         | (Record<string, unknown> & { data?: Record<string, unknown> })
         | undefined;
 
-      const prevData = current?.data;
-      const nextData = {
-        ...(typeof prevData === "object" && prevData ? prevData : {}),
-        type: c.type,
-        title: c.title,
-      } as Record<string, unknown>;
-
       useCanvasStore.getState().updateComponent(activeId, c.id, {
         title: c.title,
-        data: nextData,
+        data: {
+          ...(typeof current?.data === "object" && current?.data
+            ? (current.data as Record<string, unknown>)
+            : {}),
+          type: c.type,
+          // Keep title in data as well for backward compatibility
+          title: c.title,
+        },
       });
     });
 
-    // Reorder according to charts order
+    // Reorder according to charts order using store helper for stability
     shards.forEach((c, targetIndex) => {
       useCanvasStore.getState().reorderComponent(activeId, c.id, targetIndex);
     });
@@ -99,7 +99,10 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
         .filter((c) => c._componentType === "Graph")
         .map((c) => ({
           id: c.componentId,
-          title: (c as { title?: string }).title ?? "",
+          title:
+            (c as { title?: string }).title ??
+            (c as { data?: { title?: string } }).data?.title ??
+            "",
           type: ((c as { data?: { type?: string } }).data?.type ?? "bar") as
             | "bar"
             | "line"

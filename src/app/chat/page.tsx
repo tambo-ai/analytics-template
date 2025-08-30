@@ -1,4 +1,5 @@
 "use client";
+import { useMcpServers } from "@/components/tambo/mcp-config-modal";
 import { MessageThreadFull } from "@/components/tambo/message-thread-full";
 import ComponentsCanvas from "@/components/ui/components-canvas";
 import { InteractableCanvasDetails } from "@/components/ui/interactable-canvas-details";
@@ -7,24 +8,8 @@ import { components, tools } from "@/lib/tambo";
 import { TamboProvider } from "@tambo-ai/react";
 import { TamboMcpProvider } from "@tambo-ai/react/mcp";
 
-// Define MCP transport types
-enum MCPTransport {
-  SSE = "sse",
-  HTTP = "http",
-}
-
-// Define MCP server configuration types
-type MCPServerConfig =
-  | string
-  | {
-      url: string;
-      transport?: MCPTransport;
-      name?: string;
-    };
-
 export default function Home() {
-  // Load MCP server configurations
-  const mcpServers: MCPServerConfig[] = [];
+  const mcpServers = useMcpServers();
 
   // You can customize default suggestions via MessageThreadFull internals
 
