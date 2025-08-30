@@ -3,25 +3,25 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import type { Components } from "react-markdown";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, ExternalLink } from "lucide-react";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
-import DOMPurify from 'dompurify';
+import DOMPurify from "dompurify";
 
 /**
- * Markdown Components for React-Markdown
+ * Markdown Components for Streamdown
  *
  * This module provides customized components for rendering markdown content with syntax highlighting.
  * It uses highlight.js for code syntax highlighting and supports streaming content updates.
  *
  * @example
  * ```tsx
- * import { createMarkdownComponents } from './markdownComponents';
- * import ReactMarkdown from 'react-markdown';
+ * import { createMarkdownComponents } from './markdown-components';
+ * import { Streamdown } from 'streamdown';
  *
  * const MarkdownRenderer = ({ content }) => {
- *   const components = createMarkdownComponents('light');
- *   return <ReactMarkdown components={components}>{content}</ReactMarkdown>;
+ *   const components = createMarkdownComponents();
+ *   return <Streamdown components={components}>{content}</Streamdown>;
  * };
  * ```
  */
@@ -86,9 +86,8 @@ const CodeHeader = ({
 };
 
 /**
- * Creates a set of components for use with react-markdown
- * @param theme - The theme to use ('light' or 'dark')
- * @returns Components object for react-markdown
+ * Creates a set of components for use with streamdown
+ * @returns Components object for streamdown
  */
 export const createMarkdownComponents = (): Components => ({
   code: function Code({ className, children, ...props }) {
@@ -107,7 +106,7 @@ export const createMarkdownComponents = (): Components => ({
 
     if (match && looksLikeCode(content)) {
       return (
-        <div className="relative border border-border rounded-md bg-muted max-w-[80ch] text-sm">
+        <div className="relative border border-border rounded-md bg-muted max-w-[80ch] text-sm my-4">
           <CodeHeader language={match[1]} code={content} />
           <div
             className={cn(
@@ -120,7 +119,9 @@ export const createMarkdownComponents = (): Components => ({
             <pre className="p-4 whitespace-pre">
               <code
                 className={className}
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(highlighted ?? content) }}
+                dangerouslySetInnerHTML={{
+                  __html: DOMPurify.sanitize(highlighted ?? content),
+                }}
               />
             </pre>
           </div>
@@ -213,9 +214,10 @@ export const createMarkdownComponents = (): Components => ({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-primary hover:underline"
+      className="text-primary font-medium px-1.5 py-0.5 rounded-md bg-primary/5 hover:bg-primary/10 hover:underline transition-colors inline-flex items-center gap-1.5"
     >
       {children}
+      <ExternalLink className="w-3 h-3" />
     </a>
   ),
 

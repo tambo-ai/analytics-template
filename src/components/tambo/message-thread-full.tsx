@@ -1,35 +1,35 @@
 "use client";
 
-import type { messageVariants } from "@/components/ui/message";
 import {
   MessageInput,
-  MessageInputError,
-  MessageInputMcpConfigButton,
-  MessageInputSubmitButton,
   MessageInputTextarea,
   MessageInputToolbar,
-} from "@/components/ui/message-input";
+  MessageInputSubmitButton,
+  MessageInputError,
+  // MessageInputMcpConfigButton,
+} from "@/components/tambo/message-input";
 import {
   MessageSuggestions,
-  MessageSuggestionsList,
   MessageSuggestionsStatus,
-} from "@/components/ui/message-suggestions";
-import { ScrollableMessageContainer } from "@/components/ui/scrollable-message-container";
-import {
-  ThreadContainer,
-  useThreadContainerContext,
-} from "@/components/ui/thread-container";
-import {
-  ThreadContent,
-  ThreadContentMessages,
-} from "@/components/ui/thread-content";
+  MessageSuggestionsList,
+} from "@/components/tambo/message-suggestions";
+import type { messageVariants } from "@/components/tambo/message";
 import {
   ThreadHistory,
   ThreadHistoryHeader,
-  ThreadHistoryList,
   ThreadHistoryNewButton,
   ThreadHistorySearch,
-} from "@/components/ui/thread-history";
+  ThreadHistoryList,
+} from "@/components/tambo/thread-history";
+import {
+  ThreadContent,
+  ThreadContentMessages,
+} from "@/components/tambo/thread-content";
+import {
+  ThreadContainer,
+  useThreadContainerContext,
+} from "@/components/tambo/thread-container";
+import { ScrollableMessageContainer } from "@/components/tambo/scrollable-message-container";
 import { useMergedRef } from "@/lib/thread-hooks";
 import type { Suggestion } from "@tambo-ai/react";
 import type { VariantProps } from "class-variance-authority";
@@ -45,7 +45,7 @@ export interface MessageThreadFullProps
   /**
    * Controls the visual styling of messages in the thread.
    * Possible values include: "default", "compact", etc.
-   * These values are defined in messageVariants from "@/components/ui/message".
+   * These values are defined in messageVariants from "@/components/tambo/message".
    * @example variant="compact"
    */
   variant?: VariantProps<typeof messageVariants>["variant"];
@@ -73,22 +73,21 @@ export const MessageThreadFull = React.forwardRef<
   const defaultSuggestions: Suggestion[] = [
     {
       id: "suggestion-1",
-      title: "Sales performance",
-      detailedSuggestion: "Show me our sales performance for the last quarter",
-      messageId: "analytics-query",
+      title: "Get started",
+      detailedSuggestion: "What can you help me with?",
+      messageId: "welcome-query",
     },
     {
       id: "suggestion-2",
-      title: "User growth trends",
-      detailedSuggestion: "What are our user growth trends over the past year?",
-      messageId: "analytics-query",
+      title: "Learn more",
+      detailedSuggestion: "Tell me about your capabilities.",
+      messageId: "capabilities-query",
     },
     {
       id: "suggestion-3",
-      title: "Revenue breakdown",
-      detailedSuggestion:
-        "Can you provide a breakdown of our revenue by product category?",
-      messageId: "analytics-query",
+      title: "Examples",
+      detailedSuggestion: "Show me some example queries I can try.",
+      messageId: "examples-query",
     },
   ];
 
@@ -114,7 +113,8 @@ export const MessageThreadFull = React.forwardRef<
           <MessageInput contextKey={contextKey}>
             <MessageInputTextarea />
             <MessageInputToolbar>
-              <MessageInputMcpConfigButton />
+              {/* Uncomment this to enable client-side MCP config modal button */}
+              {/* <MessageInputMcpConfigButton /> */}
               <MessageInputSubmitButton />
             </MessageInputToolbar>
             <MessageInputError />

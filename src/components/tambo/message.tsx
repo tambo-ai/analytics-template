@@ -1,8 +1,5 @@
 "use client";
 
-import { createMarkdownComponents } from "@/components/ui/markdown-components";
-import { generateId, useCanvasStore } from "@/lib/canvas-storage";
-import { components } from "@/lib/tambo";
 import { checkHasContent, getSafeContent } from "@/lib/thread-hooks";
 import { cn } from "@/lib/utils";
 import type { TamboThreadMessage } from "@tambo-ai/react";
@@ -13,7 +10,8 @@ import stringify from "json-stringify-pretty-compact";
 import { Check, ChevronDown, ExternalLink, Loader2, X } from "lucide-react";
 import * as React from "react";
 import { useState } from "react";
-import ReactMarkdown from "react-markdown";
+import { Streamdown } from "streamdown";
+import { createMarkdownComponents } from "@/components/tambo/markdown-components";
 
 /**
  * CSS variants for the message container
@@ -109,11 +107,11 @@ export interface MessageProps
 const Message = React.forwardRef<HTMLDivElement, MessageProps>(
   (
     { children, className, role, variant, isLoading, message, ...props },
-    ref
+    ref,
   ) => {
     const contextValue = React.useMemo(
       () => ({ role, variant, isLoading, message }),
-      [role, variant, isLoading, message]
+      [role, variant, isLoading, message],
     );
 
     // Don't render tool response messages as they're shown in tool call dropdowns
@@ -133,7 +131,7 @@ const Message = React.forwardRef<HTMLDivElement, MessageProps>(
         </div>
       </MessageContext.Provider>
     );
-  }
+  },
 );
 Message.displayName = "Message";
 
@@ -182,18 +180,18 @@ export interface MessageContentProps
 const MessageContent = React.forwardRef<HTMLDivElement, MessageContentProps>(
   (
     { className, children, content: contentProp, markdown = true, ...props },
-    ref
+    ref,
   ) => {
     const { message, isLoading } = useMessageContext();
     const contentToRender = children ?? contentProp ?? message.content;
 
     const safeContent = React.useMemo(
       () => getSafeContent(contentToRender as TamboThreadMessage["content"]),
-      [contentToRender]
+      [contentToRender],
     );
     const hasContent = React.useMemo(
       () => checkHasContent(contentToRender as TamboThreadMessage["content"]),
-      [contentToRender]
+      [contentToRender],
     );
 
     const showLoading = isLoading && !hasContent;
@@ -202,8 +200,8 @@ const MessageContent = React.forwardRef<HTMLDivElement, MessageContentProps>(
       <div
         ref={ref}
         className={cn(
-          "relative block rounded-3xl px-4 py-2 text-[15px] leading-relaxed transition-all duration-200 font-medium max-w-full [&_p]:py-1 [&_ul]:py-4 [&_ol]:py-4 [&_li]:list-item",
-          className
+          "relative block rounded-3xl px-4 py-2 text-[15px] leading-relaxed transition-all duration-200 font-medium max-w-full [&_p]:py-1 [&_li]:list-item",
+          className,
         )}
         data-slot="message-content"
         {...props}
@@ -227,9 +225,9 @@ const MessageContent = React.forwardRef<HTMLDivElement, MessageContentProps>(
             ) : React.isValidElement(contentToRender) ? (
               contentToRender
             ) : markdown ? (
-              <ReactMarkdown components={createMarkdownComponents()}>
+              <Streamdown components={createMarkdownComponents()}>
                 {typeof safeContent === "string" ? safeContent : ""}
-              </ReactMarkdown>
+              </Streamdown>
             ) : (
               safeContent
             )}
@@ -240,7 +238,7 @@ const MessageContent = React.forwardRef<HTMLDivElement, MessageContentProps>(
         )}
       </div>
     );
-  }
+  },
 );
 MessageContent.displayName = "MessageContent";
 
@@ -256,7 +254,7 @@ export interface ToolcallInfoProps
 
 function getToolStatusMessage(
   message: TamboThreadMessage,
-  isLoading: boolean | undefined
+  isLoading: boolean | undefined,
 ) {
   const isToolCall = message.actionType === "tool_call";
   if (!isToolCall) return null;
@@ -285,7 +283,7 @@ const ToolcallInfo = React.forwardRef<HTMLDivElement, ToolcallInfoProps>(
     const associatedToolResponse = React.useMemo(() => {
       if (!thread?.messages) return null;
       const currentMessageIndex = thread.messages.findIndex(
-        (m: TamboThreadMessage) => m.id === message.id
+        (m: TamboThreadMessage) => m.id === message.id,
       );
       if (currentMessageIndex === -1) return null;
       for (let i = currentMessageIndex + 1; i < thread.messages.length; i++) {
@@ -315,7 +313,7 @@ const ToolcallInfo = React.forwardRef<HTMLDivElement, ToolcallInfoProps>(
         ref={ref}
         className={cn(
           "flex flex-col items-start text-xs opacity-50",
-          className
+          className,
         )}
         data-slot="toolcall-info"
         {...props}
@@ -327,7 +325,7 @@ const ToolcallInfo = React.forwardRef<HTMLDivElement, ToolcallInfoProps>(
             aria-controls={toolDetailsId}
             onClick={() => setIsExpanded(!isExpanded)}
             className={cn(
-              "flex items-center gap-1 cursor-pointer hover:bg-gray-100 rounded-md p-1 select-none w-fit"
+              "flex items-center gap-1 cursor-pointer hover:bg-gray-100 rounded-md p-1 select-none w-fit",
             )}
           >
             {hasToolError ? (
@@ -341,7 +339,7 @@ const ToolcallInfo = React.forwardRef<HTMLDivElement, ToolcallInfoProps>(
             <ChevronDown
               className={cn(
                 "w-3 h-3 transition-transform duration-200",
-                !isExpanded && "-rotate-90"
+                !isExpanded && "-rotate-90",
               )}
             />
           </button>
@@ -349,7 +347,7 @@ const ToolcallInfo = React.forwardRef<HTMLDivElement, ToolcallInfoProps>(
             id={toolDetailsId}
             className={cn(
               "flex flex-col gap-1 p-3 overflow-hidden transition-[max-height,opacity,padding] duration-300 w-full",
-              isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0 p-0"
+              isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0 p-0",
             )}
           >
             <span className="whitespace-pre-wrap">
@@ -377,17 +375,17 @@ const ToolcallInfo = React.forwardRef<HTMLDivElement, ToolcallInfoProps>(
         </div>
       </div>
     );
-  }
+  },
 );
 
 ToolcallInfo.displayName = "ToolcallInfo";
 
 function keyifyParameters(
-  parameters: TamboAI.ToolCallRequest["parameters"] | undefined
+  parameters: TamboAI.ToolCallRequest["parameters"] | undefined,
 ) {
   if (!parameters) return;
   return Object.fromEntries(
-    parameters.map((p) => [p.parameterName, p.parameterValue])
+    parameters.map((p) => [p.parameterName, p.parameterValue]),
   );
 }
 
@@ -397,7 +395,7 @@ function keyifyParameters(
  * @returns Formatted content or original content if not JSON
  */
 function formatToolResult(
-  content: TamboThreadMessage["content"]
+  content: TamboThreadMessage["content"],
 ): React.ReactNode {
   if (!content) return content;
 
@@ -438,74 +436,6 @@ const MessageRenderedComponentArea = React.forwardRef<
 >(({ className, children, ...props }, ref) => {
   const { message, role } = useMessageContext();
   const [canvasExists, setCanvasExists] = React.useState(false);
-  const { addComponent, activeCanvasId, createCanvas } = useCanvasStore();
-
-  const addToDashboard = React.useCallback(() => {
-    const wrapperElement = message.renderedComponent as React.ReactElement;
-    let componentType = "unknown";
-    let componentProps: Record<string, unknown> = {};
-
-    if (
-      React.isValidElement(wrapperElement) &&
-      (wrapperElement as { props?: { children?: React.ReactElement } }).props
-        ?.children
-    ) {
-      const actualComponent = (
-        wrapperElement as { props: { children: React.ReactElement } }
-      ).props.children as React.ReactElement;
-
-      if (React.isValidElement(actualComponent)) {
-        const matchedComponent = components.find(
-          (comp) => comp.component === actualComponent.type
-        );
-        if (matchedComponent) {
-          componentType = matchedComponent.name;
-        } else if (typeof actualComponent.type === "function") {
-          const typeFunc =
-            actualComponent.type as React.ComponentType<unknown> & {
-              displayName?: string;
-              name?: string;
-            };
-          const funcName = typeFunc.displayName || typeFunc.name || "unknown";
-          componentType = funcName === "Graph" ? "Graph" : funcName;
-        }
-
-        if (actualComponent.props) {
-          // Limit props for known components to serializable fields
-          if (componentType === "Graph") {
-            const { data, title, showLegend, variant, size, className } =
-              actualComponent.props as Record<string, unknown>;
-            componentProps = {
-              data,
-              title,
-              showLegend,
-              variant,
-              size,
-              className,
-            };
-          } else {
-            componentProps = { ...actualComponent.props };
-          }
-        }
-      }
-    }
-
-    let targetCanvasId = activeCanvasId;
-    if (!targetCanvasId) {
-      const newCanvas = createCanvas();
-      targetCanvasId = newCanvas.id;
-    }
-
-    if (!targetCanvasId) return;
-
-    const componentId = generateId();
-    addComponent(targetCanvasId, {
-      ...componentProps,
-      componentId,
-      _inCanvas: true,
-      _componentType: componentType,
-    });
-  }, [message.renderedComponent, activeCanvasId, addComponent, createCanvas]);
 
   // Check if canvas exists on mount and window resize
   React.useEffect(() => {
@@ -543,7 +473,7 @@ const MessageRenderedComponentArea = React.forwardRef<
     >
       {children ??
         (canvasExists ? (
-          <div className="flex items-center gap-3 pl-4">
+          <div className="flex justify-start pl-4">
             <button
               onClick={() => {
                 if (typeof window !== "undefined") {
@@ -553,7 +483,7 @@ const MessageRenderedComponentArea = React.forwardRef<
                         messageId: message.id,
                         component: message.renderedComponent,
                       },
-                    })
+                    }),
                   );
                 }
               }}
@@ -563,114 +493,9 @@ const MessageRenderedComponentArea = React.forwardRef<
               View component
               <ExternalLink className="w-3.5 h-3.5" />
             </button>
-            <button
-              onClick={addToDashboard}
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-secondary transition-colors duration-200 cursor-pointer group"
-              aria-label="Add component to dashboard"
-            >
-              Add to dashboard
-            </button>
           </div>
         ) : (
-          <div>
-            <div className="flex justify-start pl-2">
-              <button
-                onClick={addToDashboard}
-                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-secondary transition-colors duration-200 cursor-pointer group"
-                aria-label="Add component to dashboard"
-              >
-                Add to dashboard
-              </button>
-            </div>
-            <div
-              className="w-full pt-2 px-2 cursor-move"
-              draggable={true}
-              onDragStart={(e) => {
-                const wrapperElement =
-                  message.renderedComponent as React.ReactElement;
-                let componentType = "unknown";
-                let componentProps = {} as Record<string, unknown>;
-
-                if (
-                  React.isValidElement(wrapperElement) &&
-                  (
-                    wrapperElement as {
-                      props?: { children?: React.ReactElement };
-                    }
-                  ).props?.children
-                ) {
-                  const actualComponent = (
-                    wrapperElement as {
-                      props: { children: React.ReactElement };
-                    }
-                  ).props.children as React.ReactElement;
-
-                  if (React.isValidElement(actualComponent)) {
-                    const matchedComponent = components.find(
-                      (comp) => comp.component === actualComponent.type
-                    );
-                    if (matchedComponent) {
-                      componentType = matchedComponent.name;
-                    } else if (typeof actualComponent.type === "function") {
-                      const typeFunc =
-                        actualComponent.type as React.ComponentType<unknown> & {
-                          displayName?: string;
-                          name?: string;
-                        };
-                      const funcName =
-                        typeFunc.displayName || typeFunc.name || "unknown";
-                      componentType = funcName === "Graph" ? "Graph" : funcName;
-                    }
-
-                    if (actualComponent.props) {
-                      // Normalize props for Graph so subsequent edits (title/type)
-                      // via CanvasDetails work whether the component was added by
-                      // button or drag-and-drop.
-                      if (componentType === "Graph") {
-                        const {
-                          data,
-                          title,
-                          showLegend,
-                          variant,
-                          size,
-                          className,
-                        } = actualComponent.props as Record<string, unknown>;
-                        componentProps = {
-                          data,
-                          title,
-                          showLegend,
-                          variant,
-                          size,
-                          className,
-                        };
-                      } else {
-                        componentProps = { ...actualComponent.props };
-                      }
-                    }
-                  }
-                }
-
-                const dragData = {
-                  component: componentType,
-                  props: {
-                    ...componentProps,
-                    componentId: `id-${Date.now()}-${Math.random()
-                      .toString(36)
-                      .substring(2, 9)}`,
-                    _inCanvas: false,
-                    _componentType: componentType,
-                  },
-                };
-                e.dataTransfer.setData(
-                  "application/json",
-                  JSON.stringify(dragData)
-                );
-                e.dataTransfer.effectAllowed = "copy";
-              }}
-            >
-              {message.renderedComponent}
-            </div>
-          </div>
+          <div className="w-full pt-2 px-2">{message.renderedComponent}</div>
         ))}
     </div>
   );

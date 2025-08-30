@@ -1,8 +1,8 @@
 "use client";
+import { MessageThreadFull } from "@/components/tambo/message-thread-full";
 import ComponentsCanvas from "@/components/ui/components-canvas";
 import { InteractableCanvasDetails } from "@/components/ui/interactable-canvas-details";
 import { InteractableTabs } from "@/components/ui/interactable-tabs";
-import { MessageThreadFull } from "@/components/ui/message-thread-full";
 import { components, tools } from "@/lib/tambo";
 import { TamboProvider } from "@tambo-ai/react";
 import { TamboMcpProvider } from "@tambo-ai/react/mcp";

@@ -1,19 +1,19 @@
 "use client";
 
-import { createMarkdownComponents } from "@/components/ui/markdown-components";
-import { cn } from "@/lib/utils";
+import { type McpServerInfo, MCPTransport } from "@tambo-ai/react/mcp";
+import { ChevronDown, X, Trash2 } from "lucide-react";
+import React from "react";
+import { createPortal } from "react-dom";
+import { motion } from "framer-motion";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@radix-ui/react-dropdown-menu";
-import { type McpServerInfo, MCPTransport } from "@tambo-ai/react/mcp";
-import { motion } from "framer-motion";
-import { ChevronDown, Trash2, X } from "lucide-react";
-import React from "react";
-import { createPortal } from "react-dom";
-import Markdown from "react-markdown";
+import { createMarkdownComponents } from "@/components/tambo/markdown-components";
+import { Streamdown } from "streamdown";
+import { cn } from "@/lib/utils";
 
 /**
  * Modal component for configuring client-side MCP (Model Context Protocol) servers.
@@ -48,7 +48,7 @@ export const McpConfigModal = ({
   const [serverUrl, setServerUrl] = React.useState("");
   const [serverName, setServerName] = React.useState("");
   const [transportType, setTransportType] = React.useState<MCPTransport>(
-    MCPTransport.HTTP
+    MCPTransport.HTTP,
   );
   const [savedSuccess, setSavedSuccess] = React.useState(false);
   const [showInstructions, setShowInstructions] = React.useState(false);
@@ -79,7 +79,7 @@ export const McpConfigModal = ({
       window.dispatchEvent(
         new CustomEvent("mcp-servers-updated", {
           detail: mcpServers,
-        })
+        }),
       );
 
       if (mcpServers.length > 0) {
@@ -145,7 +145,7 @@ After configuring your MCP servers below, integrate them into your application.
 #### 1. Import the required components
 
 \`\`\`tsx
-import { useMcpServers } from "@/components/ui/mcp-config-modal";
+import { useMcpServers } from "@/components/tambo/mcp-config-modal";
 import { TamboMcpProvider } from "@tambo-ai/react/mcp";
 \`\`\`
 
@@ -176,7 +176,7 @@ function MyApp() {
     <motion.div
       className={cn(
         "fixed inset-0 bg-backdrop flex items-center justify-center z-50",
-        className
+        className,
       )}
       onClick={handleBackdropClick}
       initial={{ opacity: 0 }}
@@ -219,9 +219,9 @@ function MyApp() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                <Markdown components={createMarkdownComponents()}>
+                <Streamdown components={createMarkdownComponents()}>
                   {instructions}
-                </Markdown>
+                </Streamdown>
               </motion.div>
             )}
           </div>
