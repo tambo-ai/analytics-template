@@ -1,8 +1,8 @@
 "use client";
-import { ComponentsCanvas } from "@/components/ui/components-canvas";
+import { InteractableDashboard } from "@/components/ui/interactable-dashboard";
 import { MessageThreadFull } from "@/components/ui/message-thread-full";
 import { components, tools } from "@/lib/tambo";
-import { Suggestion, TamboProvider } from "@tambo-ai/react";
+import { TamboProvider } from "@tambo-ai/react";
 import { TamboMcpProvider } from "@tambo-ai/react/mcp";
 
 // Define MCP transport types
@@ -24,28 +24,7 @@ export default function Home() {
   // Load MCP server configurations
   const mcpServers: MCPServerConfig[] = [];
 
-  // Define default suggestions for the chat
-  const defaultSuggestions: Suggestion[] = [
-    {
-      id: "suggestion-1",
-      title: "Sales performance",
-      detailedSuggestion: "Show me our sales performance for the last quarter",
-      messageId: "analytics-query",
-    },
-    {
-      id: "suggestion-2",
-      title: "User growth trends",
-      detailedSuggestion: "What are our user growth trends over the past year?",
-      messageId: "analytics-query",
-    },
-    {
-      id: "suggestion-3",
-      title: "Revenue breakdown",
-      detailedSuggestion:
-        "Can you provide a breakdown of our revenue by product category?",
-      messageId: "analytics-query",
-    },
-  ];
+  // You can customize default suggestions via MessageThreadFull internals
 
   return (
     <div className="h-screen flex flex-col overflow-hidden relative">
@@ -57,13 +36,13 @@ export default function Home() {
         <TamboMcpProvider mcpServers={mcpServers}>
           <div className="flex h-full overflow-hidden">
             <div className="flex-1 overflow-hidden">
-              <MessageThreadFull
-                contextKey="tambo-template"
-                suggestions={defaultSuggestions}
-              />
+              <MessageThreadFull contextKey="tambo-template" />
             </div>
             <div className="hidden md:block w-[60%] overflow-auto">
-              <ComponentsCanvas className="h-full" />
+              <InteractableDashboard
+                interactableId="Dashboard"
+                className="h-full"
+              />
             </div>
           </div>
         </TamboMcpProvider>

@@ -32,6 +32,7 @@ export interface CanvasState {
   updateCanvas: (id: string, name: string) => Canvas | null;
   removeCanvas: (id: string) => void;
   setActiveCanvas: (id: string | null) => void;
+  reorderCanvas: (canvasId: string, newIndex: number) => void;
   clearCanvas: (id: string) => void;
   addComponent: (canvasId: string, component: CanvasComponent) => void;
   updateComponent: (
@@ -134,6 +135,21 @@ export const useCanvasStore = create<CanvasState>()(
       // Set the active canvas
       setActiveCanvas: (id: string | null) => {
         set({ activeCanvasId: id });
+      },
+
+      // Reorder canvases (tabs) by moving the specified canvasId to newIndex
+      reorderCanvas: (canvasId: string, newIndex: number) => {
+        set((state) => {
+          const currentIndex = state.canvases.findIndex((c) => c.id === canvasId);
+          if (currentIndex === -1) return state;
+
+          const canvasesCopy = [...state.canvases];
+          const [moving] = canvasesCopy.splice(currentIndex, 1);
+          const boundedIndex = Math.max(0, Math.min(canvasesCopy.length, newIndex));
+          canvasesCopy.splice(boundedIndex, 0, moving);
+
+          return { canvases: canvasesCopy };
+        });
       },
 
       // Clear all components from a canvas
