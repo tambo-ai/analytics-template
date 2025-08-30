@@ -1,54 +1,118 @@
-# Tambo MCP Template
+# Generative UI Analytics Template
 
-This is a starter NextJS app with tambo-ai for generative UI and MCP.
+This is a generative UI analytics template.
 
-[![Watch the tutorial here](https://img.youtube.com/vi/6zDDPfr7Aoo/0.jpg)](https://youtu.be/6zDDPfr7Aoo)
+Generate graphs with natural language and use natural language to interact with and manage the UI.
+
+## Features
+
+- Generate graphs inside the chat
+- Drag and drop onto a canvas
+- Edit canvases with natural language in the chat
+
+## Demo
+
+<video src="./2025-08-30-tambo-analytics.mp4" controls width="720"></video>
 
 ## Get Started
 
-1. Run `npm create-tambo@latest my-tambo-app` for a new project
+1. Run `gh repo clone tambo-ai/tambo-analytics-template` for a new project
 
-2. `npm install`
+2. `cd tambo-analytics-template`
 
-3. `npx tambo init`
+3. `npm install`
 
-- or rename `example.env.local` to `.env.local` and add your tambo API key you can get for free [here](https://tambo.co/dashboard).
+4. `npx tambo init`
+
+- or rename `example.env.local` to `.env.local` and add your tambo API key you can get for free [here](https://tambo.co/dashboard), tambo also supports self-hosting.
 
 4. Run `npm run dev` and go to `localhost:3000` to use the app!
 
-### Configure Model Context Protocol (MCP) Servers
+## Roadmap
 
-You can go to https://localhost:3000/mcp-config to add MCP servers.
+- Test with SQL mcp servers
+- Add a Component for executing SQL
+- Add a component for executing Python Transformations
 
-For the demo above we used smithery.ai's [brave-search-mcp](https://smithery.ai/server/@mikechao/brave-search-mcp)
+## App structure at a glance
 
-![brave-search-mcp](./brave-search-mcp.png)
+- **Next.js app**: Pages under `src/app/`.
 
-You can use any MCP compatible server that supports SSE or HTTP.
+  - `src/app/page.tsx`: landing page.
+  - `src/app/chat/page.tsx`: main chat interface.
 
-Our MCP config page is built using the tambo-ai/react/mcp package:
+- **Component registration and chat wiring**: See `src/lib/tambo.ts` and `src/app/chat/page.tsx`.
 
-```tsx
-// In your chat page
-<TamboProvider
-  apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
-  components={components}
->
-  <TamboMcpProvider mcpServers={mcpServers}>
-    <MessageThreadFull contextKey="tambo-template" />
-  </TamboMcpProvider>
-</TamboProvider>
-```
+- **Generatable components (created by chat)**: Components the AI can instantiate in the thread, e.g. `src/components/ui/graph.tsx`, registered in `src/lib/tambo.ts`.
 
-In this example, MCP servers are stored in browser localStorage and loaded when the application starts.
-
-You could have these servers be stored in a database or fetched from an API.
+- **Editable/readable components (stateful UI the chat can modify or inspect)**:
+  - Canvas state in `src/lib/canvas-storage.ts` (Zustand) with canvases and items.
+  - Canvas UI and interactions in `src/components/ui/components-canvas.tsx` and related interactable components like `interactable-tabs.tsx`, `interactable-canvas-details.tsx`.
+  - The chat can update existing components or read current canvas state via the registered tools/hooks that back the chat experience.
 
 For more detailed documentation, visit [Tambo's official docs](https://tambo.co/docs).
 
+## How it works
+
+Register components the AI can render, with schemas for safe props:
+
+```tsx
+// src/lib/tambo.ts (excerpt)
+import { Graph, graphSchema } from "@/components/ui/graph";
+import { DataCard, dataCardSchema } from "@/components/ui/card-data";
+import type { TamboComponent } from "@tambo-ai/react";
+
+export const components: TamboComponent[] = [
+  {
+    name: "Graph",
+    description: "Render charts (bar/line/pie)",
+    component: Graph,
+    propsSchema: graphSchema,
+  },
+  {
+    name: "DataCards",
+    description: "Selectable list of info",
+    component: DataCard,
+    propsSchema: dataCardSchema,
+  },
+];
+```
+
+Wire the chat and the editable canvas UI:
+
+```tsx
+// src/app/chat/page.tsx (excerpt)
+"use client";
+import { TamboProvider } from "@tambo-ai/react";
+import { MessageThreadFull } from "@/components/ui/message-thread-full";
+import ComponentsCanvas from "@/components/ui/components-canvas";
+import { InteractableTabs } from "@/components/ui/interactable-tabs";
+import { InteractableCanvasDetails } from "@/components/ui/interactable-canvas-details";
+import { components, tools } from "@/lib/tambo";
+
+export default function Chat() {
+  return (
+    <TamboProvider
+      apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+      components={components}
+      tools={tools}
+    >
+      <div className="flex h-full">
+        <MessageThreadFull contextKey="tambo-template" />
+        <div className="hidden md:block w-[60%]">
+          <InteractableTabs interactableId="Tabs" />
+          <InteractableCanvasDetails interactableId="CanvasDetails" />
+          <ComponentsCanvas className="h-full" />
+        </div>
+      </div>
+    </TamboProvider>
+  );
+}
+```
+
 ## Customizing
 
-### Change what components tambo can control
+### Change what components the AI can control
 
 You can see how the `Graph` component is registered with tambo in `src/lib/tambo.ts`:
 
@@ -66,3 +130,5 @@ const components: TamboComponent[] = [
 ```
 
 You can find more information about the options [here](https://tambo.co/docs/concepts/registering-components)
+
+P.S. We use Tambo under the hood to manage chat state, which components the AI can render, and which components the AI can interact with. Tambo is 100% open source — see the repository at [tambo-ai/tambo](https://github.com/tambo-ai/tambo).
