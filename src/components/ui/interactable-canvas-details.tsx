@@ -20,7 +20,7 @@ const canvasDetailsPropsSchema = z.object({
       charts: z
         .array(chartSchema)
         .describe(
-          "Active canvas charts in desired order (Graph components only)"
+          "Active canvas charts in desired order (Graph components only)",
         ),
     })
     .optional(),
@@ -115,7 +115,7 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
       onPropsUpdate?.({ state: payload, className });
       if (interactableId) {
         const match = interactableComponents.find(
-          (c) => c.props?.interactableId === interactableId
+          (c) => c.props?.interactableId === interactableId,
         );
         if (match) {
           updateInteractableComponentProps(match.id, {
@@ -149,5 +149,5 @@ export const InteractableCanvasDetails = withInteractable(
     description:
       "Active tab charts (Graph only). To edit charts, update 'state.charts' with desired order, titles, and types.",
     propsSchema: canvasDetailsPropsSchema,
-  }
+  },
 );

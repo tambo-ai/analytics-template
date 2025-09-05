@@ -17,6 +17,7 @@ export default function Home() {
     <div className="h-screen flex flex-col overflow-hidden relative">
       <TamboProvider
         apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
+        tamboUrl={process.env.NEXT_PUBLIC_TAMBO_URL!}
         components={components}
         tools={tools}
       >

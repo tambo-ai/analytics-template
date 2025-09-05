@@ -38,18 +38,18 @@ export interface CanvasState {
   updateComponent: (
     canvasId: string,
     componentId: string,
-    props: Record<string, unknown>
+    props: Record<string, unknown>,
   ) => CanvasComponent | null;
   removeComponent: (canvasId: string, componentId: string) => void;
   moveComponent: (
     sourceCanvasId: string,
     targetCanvasId: string,
-    componentId: string
+    componentId: string,
   ) => CanvasComponent | null;
   reorderComponent: (
     canvasId: string,
     componentId: string,
-    newIndex: number
+    newIndex: number,
   ) => void;
 }
 
@@ -141,7 +141,7 @@ export const useCanvasStore = create<CanvasState>()(
       reorderCanvas: (canvasId: string, newIndex: number) => {
         set((state) => {
           const currentIndex = state.canvases.findIndex(
-            (c) => c.id === canvasId
+            (c) => c.id === canvasId,
           );
           if (currentIndex === -1) return state;
 
@@ -149,7 +149,7 @@ export const useCanvasStore = create<CanvasState>()(
           const [moving] = canvasesCopy.splice(currentIndex, 1);
           const boundedIndex = Math.max(
             0,
-            Math.min(canvasesCopy.length, newIndex)
+            Math.min(canvasesCopy.length, newIndex),
           );
           canvasesCopy.splice(boundedIndex, 0, moving);
 
@@ -161,7 +161,7 @@ export const useCanvasStore = create<CanvasState>()(
       clearCanvas: (id: string) => {
         set((state) => ({
           canvases: state.canvases.map((c) =>
-            c.id === id ? { ...c, components: [] } : c
+            c.id === id ? { ...c, components: [] } : c,
           ),
         }));
       },
@@ -192,7 +192,7 @@ export const useCanvasStore = create<CanvasState>()(
             targetCanvas.components.some((c) => c.componentId === componentId)
           ) {
             console.log(
-              `[CANVAS] Component ${componentId} already exists in canvas ${canvasId}`
+              `[CANVAS] Component ${componentId} already exists in canvas ${canvasId}`,
             );
             // Remove operation from pending after 100ms
             setTimeout(() => {
@@ -217,7 +217,7 @@ export const useCanvasStore = create<CanvasState>()(
                     },
                   ],
                 }
-              : c
+              : c,
           );
 
           // Remove operation from pending after 100ms
@@ -235,7 +235,7 @@ export const useCanvasStore = create<CanvasState>()(
       updateComponent: (
         canvasId: string,
         componentId: string,
-        props: Record<string, unknown>
+        props: Record<string, unknown>,
       ) => {
         let updatedComponent: CanvasComponent | null = null;
 
@@ -267,10 +267,10 @@ export const useCanvasStore = create<CanvasState>()(
               ? {
                   ...c,
                   components: c.components.filter(
-                    (comp) => comp.componentId !== componentId
+                    (comp) => comp.componentId !== componentId,
                   ),
                 }
-              : c
+              : c,
           ),
         }));
       },
@@ -279,7 +279,7 @@ export const useCanvasStore = create<CanvasState>()(
       moveComponent: (
         sourceCanvasId: string,
         targetCanvasId: string,
-        componentId: string
+        componentId: string,
       ) => {
         // Skip if source and target are the same
         if (sourceCanvasId === targetCanvasId) return null;
@@ -289,7 +289,7 @@ export const useCanvasStore = create<CanvasState>()(
 
         if (pendingOps.has(operationKey)) {
           console.log(
-            `[CANVAS] Skipping duplicate move operation: ${operationKey}`
+            `[CANVAS] Skipping duplicate move operation: ${operationKey}`,
           );
           return null;
         }
@@ -303,25 +303,25 @@ export const useCanvasStore = create<CanvasState>()(
         set((state) => {
           // Find component in source canvas
           const sourceCanvas = state.canvases.find(
-            (c) => c.id === sourceCanvasId
+            (c) => c.id === sourceCanvasId,
           );
           if (!sourceCanvas) return state;
 
           const component = sourceCanvas.components.find(
-            (c) => c.componentId === componentId
+            (c) => c.componentId === componentId,
           );
           if (!component) return state;
 
           // Check if component already exists in target
           const targetCanvas = state.canvases.find(
-            (c) => c.id === targetCanvasId
+            (c) => c.id === targetCanvasId,
           );
           if (
             targetCanvas &&
             targetCanvas.components.some((c) => c.componentId === componentId)
           ) {
             console.log(
-              `[CANVAS] Component ${componentId} already exists in target canvas ${targetCanvasId}`
+              `[CANVAS] Component ${componentId} already exists in target canvas ${targetCanvasId}`,
             );
             return state;
           }
@@ -338,7 +338,7 @@ export const useCanvasStore = create<CanvasState>()(
               return {
                 ...c,
                 components: c.components.filter(
-                  (comp) => comp.componentId !== componentId
+                  (comp) => comp.componentId !== componentId,
                 ),
               };
             }
@@ -368,7 +368,7 @@ export const useCanvasStore = create<CanvasState>()(
       reorderComponent: (
         canvasId: string,
         componentId: string,
-        newIndex: number
+        newIndex: number,
       ) => {
         set((state) => {
           const updatedCanvases = state.canvases.map((c) => {
@@ -376,7 +376,7 @@ export const useCanvasStore = create<CanvasState>()(
 
             // Find the component
             const componentIndex = c.components.findIndex(
-              (comp) => comp.componentId === componentId
+              (comp) => comp.componentId === componentId,
             );
             if (componentIndex === -1) return c;
 
@@ -389,7 +389,7 @@ export const useCanvasStore = create<CanvasState>()(
             // Clamp newIndex to array bounds
             const boundedIndex = Math.max(
               0,
-              Math.min(newComponents.length, newIndex)
+              Math.min(newComponents.length, newIndex),
             );
 
             // Insert at new position
@@ -412,6 +412,6 @@ export const useCanvasStore = create<CanvasState>()(
         canvases: state.canvases,
         activeCanvasId: state.activeCanvasId,
       }),
-    }
-  )
+    },
+  ),
 );

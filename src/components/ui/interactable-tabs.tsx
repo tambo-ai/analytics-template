@@ -88,7 +88,7 @@ function TabsWrapper(props: TabsProps) {
       onPropsUpdate?.({ state: payload, className });
       if (interactableId) {
         const match = interactableComponents.find(
-          (c) => c.props?.interactableId === interactableId
+          (c) => c.props?.interactableId === interactableId,
         );
         if (match) {
           updateInteractableComponentProps(match.id, {
@@ -127,7 +127,7 @@ function TabsWrapper(props: TabsProps) {
   useEffect(() => {
     if (!interactableId) return;
     const match = interactableComponents.find(
-      (c) => c.props?.interactableId === interactableId
+      (c) => c.props?.interactableId === interactableId,
     );
     if (!match) return;
     const s = useCanvasStore.getState();

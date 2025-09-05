@@ -36,10 +36,12 @@ export default function Home() {
           <div className="bg-white px-8 py-4">
             <h2 className="text-xl font-semibold mb-4">How it works:</h2>
             <p className="text-gray-600 mb-4">
-              This template demonstrates drag & drop analytics with AI-generated components.
+              This template demonstrates drag & drop analytics with AI-generated
+              components.
             </p>
             <p className="text-gray-600 mb-4">
-              Ask the AI to create charts and data visualizations, then drag them onto the canvas for organization.
+              Ask the AI to create charts and data visualizations, then drag
+              them onto the canvas for organization.
             </p>
             <div className="flex gap-4 flex-wrap mt-4">
               <a

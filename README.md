@@ -23,7 +23,6 @@ Generate graphs with natural language and use natural language to interact with 
 3. `npm install`
 
 4. `npx tambo init`
-
    - or rename `example.env.local` to `.env.local` and set:
 
      ```env
@@ -41,7 +40,6 @@ Generate graphs with natural language and use natural language to interact with 
 ## App structure at a glance
 
 - **Next.js app**: Pages under `src/app/`.
-
   - `src/app/page.tsx`: landing page.
   - `src/app/chat/page.tsx`: main chat interface.
 

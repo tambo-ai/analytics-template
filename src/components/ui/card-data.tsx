@@ -37,7 +37,7 @@ export const dataCardSchema = z.object({
           .string()
           .optional()
           .describe("Optional URL for the card to navigate to"),
-      })
+      }),
     )
     .describe("Array of selectable cards to display"),
 });
@@ -62,7 +62,7 @@ export const DataCard = React.forwardRef<HTMLDivElement, DataCardProps>(
     // Initialize Tambo component state with unique ID
     const [state, setState] = useTamboComponentState<DataCardState>(
       `data-card-${id}`,
-      { selectedValues: [] }
+      { selectedValues: [] },
     );
 
     // Handle option selection
@@ -100,7 +100,7 @@ export const DataCard = React.forwardRef<HTMLDivElement, DataCardProps>(
       Array.isArray(options) &&
       options.length > 0 &&
       options.every(
-        (option) => state && state.selectedValues.includes(option.value)
+        (option) => state && state.selectedValues.includes(option.value),
       );
 
     // Ensure options is an array
@@ -122,7 +122,7 @@ export const DataCard = React.forwardRef<HTMLDivElement, DataCardProps>(
                   "flex items-center gap-1.5",
                   state && state.selectedValues.includes(card.value)
                     ? "bg-accent text-accent-foreground"
-                    : "bg-background hover:bg-accent hover:text-accent-foreground"
+                    : "bg-background hover:bg-accent hover:text-accent-foreground",
                 )}
                 onClick={() => handleToggleCard(card.value)}
               >
@@ -131,7 +131,7 @@ export const DataCard = React.forwardRef<HTMLDivElement, DataCardProps>(
                     "w-4 h-4 rounded border flex items-center justify-center",
                     state && state.selectedValues.includes(card.value)
                       ? "border-accent-foreground bg-accent"
-                      : "border-muted-foreground"
+                      : "border-muted-foreground",
                   )}
                 >
                   {state && state.selectedValues.includes(card.value) && (
@@ -180,7 +180,7 @@ export const DataCard = React.forwardRef<HTMLDivElement, DataCardProps>(
                 "border border-flat",
                 allSelected
                   ? "bg-accent text-accent-foreground"
-                  : "bg-background hover:bg-accent hover:text-accent-foreground"
+                  : "bg-background hover:bg-accent hover:text-accent-foreground",
               )}
               onClick={() => toggleAllItems(!allSelected)}
             >
@@ -190,7 +190,7 @@ export const DataCard = React.forwardRef<HTMLDivElement, DataCardProps>(
         )}
       </div>
     );
-  }
+  },
 );
 
 DataCard.displayName = "DataCard";

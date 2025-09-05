@@ -1,9 +1,6 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(npm run lint)",
-      "Bash(find:*)"
-    ],
+    "allow": ["Bash(npm run lint)", "Bash(find:*)"],
     "deny": []
   }
 }

@@ -25,6 +25,7 @@
     "json-stringify-pretty-compact": "^4.0.0",
     "lucide-react": "^0.542.0",
     "next": "15.5.2",
+    "radix-ui": "^1.4.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-markdown": "^10.1.0",

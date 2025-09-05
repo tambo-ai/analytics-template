@@ -46,7 +46,7 @@ export const ComponentsCanvas: React.FC<
   } = useCanvasStore();
 
   const [editingCanvasId, setEditingCanvasId] = React.useState<string | null>(
-    null
+    null,
   );
   const [pendingDeleteCanvasId, setPendingDeleteCanvasId] = React.useState<
     string | null
@@ -119,7 +119,7 @@ export const ComponentsCanvas: React.FC<
         console.error("Invalid drop data", err);
       }
     },
-    [activeCanvasId, addComponent, moveComponent]
+    [activeCanvasId, addComponent, moveComponent],
   );
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -140,7 +140,7 @@ export const ComponentsCanvas: React.FC<
       setEditingName(canvas.name);
       setPendingDeleteCanvasId(null);
     },
-    [canvases]
+    [canvases],
   );
 
   const saveRenameCanvas = React.useCallback(() => {
@@ -153,30 +153,30 @@ export const ComponentsCanvas: React.FC<
   }, [editingCanvasId, editingName, updateCanvas]);
 
   const handleDeleteCanvas = React.useCallback(
-    (id: string) => {
-      if (pendingDeleteCanvasId === id) {
+    (id: string, confirmed = false) => {
+      if (confirmed) {
         // Confirmed deletion, actually delete the canvas
         removeCanvas(id);
         setPendingDeleteCanvasId(null);
       } else {
-        // First click, mark as pending deletion
+        // Show confirmation UI
         setPendingDeleteCanvasId(id);
-        // Clear pending deletion after a timeout
+        // Auto-cancel after 10 seconds if no action taken
         setTimeout(() => {
           setPendingDeleteCanvasId((current) =>
-            current === id ? null : current
+            current === id ? null : current,
           );
-        }, 3000);
+        }, 10000);
       }
     },
-    [pendingDeleteCanvasId, removeCanvas]
+    [removeCanvas],
   );
 
   // Find component definition from registry
   const renderComponent = (componentProps: CanvasComponentProps) => {
     const componentType = componentProps._componentType;
     const componentDef = components.find(
-      (comp: TamboComponent) => comp.name === componentType
+      (comp: TamboComponent) => comp.name === componentType,
     );
 
     if (!componentDef) {
@@ -230,10 +230,10 @@ export const ComponentsCanvas: React.FC<
         </div>
 
         {/* Sortable content - make it draggable to other canvases */}
-        <div 
-          ref={setNodeRef} 
-          style={style} 
-          {...attributes} 
+        <div
+          ref={setNodeRef}
+          style={style}
+          {...attributes}
           {...listeners}
           draggable={true}
           onDragStart={(e) => {
@@ -247,7 +247,10 @@ export const ComponentsCanvas: React.FC<
                 canvasId,
               },
             };
-            e.dataTransfer.setData("application/json", JSON.stringify(dragData));
+            e.dataTransfer.setData(
+              "application/json",
+              JSON.stringify(dragData),
+            );
             e.dataTransfer.effectAllowed = "move";
           }}
           className="cursor-move"
@@ -274,7 +277,7 @@ export const ComponentsCanvas: React.FC<
           .reorderComponent(activeCanvasId, active.id as string, overIndex);
       }
     },
-    [activeCanvasId]
+    [activeCanvasId],
   );
 
   const activeCanvas = canvases.find((c) => c.id === activeCanvasId);
@@ -291,12 +294,13 @@ export const ComponentsCanvas: React.FC<
           "flex items-center overflow-x-auto p-2 pr-10 gap-1",
           "[&::-webkit-scrollbar]:w-[6px]",
           "[&::-webkit-scrollbar-thumb]:bg-gray-300",
-          "[&::-webkit-scrollbar:horizontal]:h-[4px]"
+          "[&::-webkit-scrollbar:horizontal]:h-[4px]",
         )}
       >
         {canvases.map((c) => (
           <div
             key={c.id}
+            data-canvas-id={c.id}
             onClick={() => {
               setActiveCanvas(c.id);
               setPendingDeleteCanvasId(null);
@@ -305,7 +309,7 @@ export const ComponentsCanvas: React.FC<
               "px-3 py-1 text-sm cursor-pointer whitespace-nowrap flex items-center gap-1 border-b-2",
               activeCanvasId === c.id
                 ? "border-border text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
             {editingCanvasId === c.id ? (
@@ -340,26 +344,43 @@ export const ComponentsCanvas: React.FC<
                 >
                   <PencilIcon className="h-3 w-3" />
                 </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteCanvas(c.id);
-                  }}
-                  className={cn(
-                    "ml-1 p-0.5 hover:text-foreground",
-                    pendingDeleteCanvasId === c.id &&
-                      "text-red-500 hover:text-red-600"
-                  )}
-                  title={
-                    pendingDeleteCanvasId === c.id ? "Confirm delete" : "Delete"
-                  }
-                >
-                  {pendingDeleteCanvasId === c.id ? (
-                    <CheckIcon className="h-3 w-3" />
+                {canvases.length > 1 &&
+                  (pendingDeleteCanvasId === c.id ? (
+                    <div className="ml-1 flex items-center gap-1 px-2 py-0.5 bg-red-100 dark:bg-red-400/30 rounded text-xs text-destructive dark:text-red-300">
+                      <span>Delete?</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCanvas(c.id, true);
+                        }}
+                        className="p-0.5 hover:text-red-900 dark:hover:text-red-100"
+                        title="Confirm delete"
+                      >
+                        <CheckIcon className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPendingDeleteCanvasId(null);
+                        }}
+                        className="p-0.5 hover:text-red-900 dark:hover:text-red-100"
+                        title="Cancel delete"
+                      >
+                        <XIcon className="h-3 w-3" />
+                      </button>
+                    </div>
                   ) : (
-                    <TrashIcon className="h-3 w-3" />
-                  )}
-                </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteCanvas(c.id);
+                      }}
+                      className="ml-1 p-0.5 hover:text-foreground"
+                      title="Delete canvas"
+                    >
+                      <TrashIcon className="h-3 w-3" />
+                    </button>
+                  ))}
               </>
             )}
           </div>
@@ -380,7 +401,7 @@ export const ComponentsCanvas: React.FC<
         {activeCanvasId && (
           <button
             onClick={() => activeCanvasId && clearCanvas(activeCanvasId)}
-            className="px-3 py-1.5 border border-gray-200 text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800 rounded-md shadow-sm flex items-center gap-1.5 text-sm"
+            className="px-3 py-1.5 border border-gray-200 text-primary hover:text-gray-200 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800 rounded-md shadow-sm flex items-center gap-1.5 text-sm cursor-pointer"
             title="Clear canvas"
           >
             <XIcon className="h-4 w-4" />
@@ -394,7 +415,7 @@ export const ComponentsCanvas: React.FC<
           "flex-1 overflow-auto p-4",
           "[&::-webkit-scrollbar]:w-[6px]",
           "[&::-webkit-scrollbar-thumb]:bg-gray-300",
-          "[&::-webkit-scrollbar:horizontal]:h-[4px]"
+          "[&::-webkit-scrollbar:horizontal]:h-[4px]",
         )}
       >
         {!activeCanvas || activeCanvas.components.length === 0 ? (

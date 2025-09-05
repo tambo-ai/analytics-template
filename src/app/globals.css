@@ -10,8 +10,17 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
-    Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  font-family:
+    var(--font-geist-sans),
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Helvetica,
+    Arial,
+    "Apple Color Emoji",
+    "Segoe UI Emoji";
 }
 
 @layer base {
@@ -153,6 +162,9 @@ body {
   }
   .text-destructive-foreground {
     color: hsl(var(--destructive-foreground));
+  }
+  .text-destructive {
+    color: hsl(var(--destructive));
   }
   .text-backdrop {
     color: hsl(var(--backdrop));
