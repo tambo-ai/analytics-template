@@ -12,6 +12,13 @@ import { Graph, graphSchema } from "@/components/tambo/graph";
 import { DataCard, dataCardSchema } from "@/components/ui/card-data";
 import type { TamboComponent } from "@tambo-ai/react";
 import { TamboTool } from "@tambo-ai/react";
+import { z } from "zod";
+import {
+  getSalesData,
+  getProducts,
+  getUserData,
+  getKPIs,
+} from "@/services/analytics-data";
 
 /**
  * tools
@@ -22,8 +29,59 @@ import { TamboTool } from "@tambo-ai/react";
  */
 
 export const tools: TamboTool[] = [
-  // Set the MCP tools https://localhost:3000/mcp-config
-  // Add non MCP tools here
+  {
+    name: "getSalesData",
+    description:
+      "Get monthly sales revenue and units data. Can filter by region (North, South, East, West) or category (Electronics, Clothing, Home)",
+    tool: getSalesData,
+    toolSchema: z.function().args(
+      z
+        .object({
+          region: z.string().optional(),
+          category: z.string().optional(),
+        })
+        .optional(),
+    ),
+  },
+  {
+    name: "getProducts",
+    description:
+      "Get top products with sales and revenue information. Can filter by category (Electronics, Furniture, Appliances)",
+    tool: getProducts,
+    toolSchema: z.function().args(
+      z
+        .object({
+          category: z.string().optional(),
+        })
+        .optional(),
+    ),
+  },
+  {
+    name: "getUserData",
+    description:
+      "Get monthly user growth and activity data. Can filter by segment (Free, Premium, Enterprise)",
+    tool: getUserData,
+    toolSchema: z.function().args(
+      z
+        .object({
+          segment: z.string().optional(),
+        })
+        .optional(),
+    ),
+  },
+  {
+    name: "getKPIs",
+    description:
+      "Get key business performance indicators. Can filter by category (Financial, Growth, Quality, Retention, Marketing)",
+    tool: getKPIs,
+    toolSchema: z.function().args(
+      z
+        .object({
+          category: z.string().optional(),
+        })
+        .optional(),
+    ),
+  },
 ];
 
 /**
