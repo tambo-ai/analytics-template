@@ -2,7 +2,7 @@
 
 import { useCanvasStore } from "@/lib/canvas-storage";
 import { useTamboInteractable, withInteractable } from "@tambo-ai/react";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { z } from "zod";
 
 // Interactable that exposes/edit charts of the active canvas only
@@ -38,6 +38,14 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
 
   const applyingRef = useRef(false);
   const lastEmittedKeyRef = useRef("");
+  const onPropsUpdateRef = useRef(onPropsUpdate);
+  const interactableComponentsRef = useRef(interactableComponents);
+
+  // Keep refs up to date
+  useEffect(() => {
+    onPropsUpdateRef.current = onPropsUpdate;
+    interactableComponentsRef.current = interactableComponents;
+  });
 
   // Inbound: apply edits to active canvas
   useEffect(() => {
@@ -89,8 +97,8 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
   }, [state]);
 
   // Outbound: publish simplified charts snapshot for active canvas
-  useEffect(() => {
-    const unsubscribe = useCanvasStore.subscribe((s) => {
+  const handleStoreUpdate = useCallback(
+    (s: ReturnType<typeof useCanvasStore.getState>) => {
       if (applyingRef.current) return;
       const active = s.activeCanvasId
         ? s.canvases.find((c) => c.id === s.activeCanvasId)
@@ -112,9 +120,9 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
       const key = JSON.stringify(payload);
       if (key === lastEmittedKeyRef.current) return;
       lastEmittedKeyRef.current = key;
-      onPropsUpdate?.({ state: payload, className });
+      onPropsUpdateRef.current?.({ state: payload, className });
       if (interactableId) {
-        const match = interactableComponents.find(
+        const match = interactableComponentsRef.current.find(
           (c) => c.props?.interactableId === interactableId,
         );
         if (match) {
@@ -124,15 +132,14 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
           });
         }
       }
-    });
+    },
+    [className, interactableId, updateInteractableComponentProps],
+  );
+
+  useEffect(() => {
+    const unsubscribe = useCanvasStore.subscribe(handleStoreUpdate);
     return () => unsubscribe();
-  }, [
-    onPropsUpdate,
-    updateInteractableComponentProps,
-    interactableId,
-    className,
-    interactableComponents,
-  ]);
+  }, [handleStoreUpdate]);
 
   // Minimal UI (hidden content is fine; needs to be rendered for MCP)
   return (
