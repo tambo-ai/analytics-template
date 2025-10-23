@@ -3,7 +3,7 @@
 import type { Canvas, CanvasComponent } from "@/lib/canvas-storage";
 import { useCanvasStore } from "@/lib/canvas-storage";
 import { useTamboInteractable, withInteractable } from "@tambo-ai/react";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { z } from "zod";
 
 // Interactable: Tabs-only manager (ids, names, activeCanvasId)
@@ -35,6 +35,14 @@ function TabsWrapper(props: TabsProps) {
 
   const applyingRef = useRef(false);
   const lastEmittedKeyRef = useRef("");
+  const onPropsUpdateRef = useRef(onPropsUpdate);
+  const interactableComponentsRef = useRef(interactableComponents);
+
+  // Keep refs up to date
+  useEffect(() => {
+    onPropsUpdateRef.current = onPropsUpdate;
+    interactableComponentsRef.current = interactableComponents;
+  });
 
   // Inbound: reconcile tabs only (ids, names, order, add/remove) and activeCanvasId
   useEffect(() => {
@@ -75,8 +83,8 @@ function TabsWrapper(props: TabsProps) {
   }, [state]);
 
   // Outbound: emit tabs slice (ids, names) and activeCanvasId
-  useEffect(() => {
-    const unsubscribe = useCanvasStore.subscribe((s) => {
+  const handleStoreUpdate = useCallback(
+    (s: ReturnType<typeof useCanvasStore.getState>) => {
       if (applyingRef.current) return;
       const payload = {
         canvases: s.canvases.map((c) => ({ id: c.id, name: c.name })),
@@ -85,9 +93,9 @@ function TabsWrapper(props: TabsProps) {
       const key = JSON.stringify(payload);
       if (key === lastEmittedKeyRef.current) return;
       lastEmittedKeyRef.current = key;
-      onPropsUpdate?.({ state: payload, className });
+      onPropsUpdateRef.current?.({ state: payload, className });
       if (interactableId) {
-        const match = interactableComponents.find(
+        const match = interactableComponentsRef.current.find(
           (c) => c.props?.interactableId === interactableId,
         );
         if (match) {
@@ -97,15 +105,14 @@ function TabsWrapper(props: TabsProps) {
           });
         }
       }
-    });
+    },
+    [className, interactableId, updateInteractableComponentProps],
+  );
+
+  useEffect(() => {
+    const unsubscribe = useCanvasStore.subscribe(handleStoreUpdate);
     return () => unsubscribe();
-  }, [
-    onPropsUpdate,
-    updateInteractableComponentProps,
-    interactableId,
-    className,
-    interactableComponents,
-  ]);
+  }, [handleStoreUpdate]);
 
   // Initial publish
   useEffect(() => {
@@ -116,17 +123,16 @@ function TabsWrapper(props: TabsProps) {
     };
     const key = JSON.stringify(initial);
     lastEmittedKeyRef.current = key;
-    onPropsUpdate?.({ state: initial, className });
+    onPropsUpdateRef.current?.({ state: initial, className });
     if (interactableId) {
       updateInteractableComponentProps(interactableId, { state: initial });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [className, interactableId, updateInteractableComponentProps]);
 
   // Resolve runtime id and publish snapshot
   useEffect(() => {
     if (!interactableId) return;
-    const match = interactableComponents.find(
+    const match = interactableComponentsRef.current.find(
       (c) => c.props?.interactableId === interactableId,
     );
     if (!match) return;
@@ -140,12 +146,7 @@ function TabsWrapper(props: TabsProps) {
       className,
     });
     lastEmittedKeyRef.current = JSON.stringify(snapshot);
-  }, [
-    interactableComponents,
-    interactableId,
-    updateInteractableComponentProps,
-    className,
-  ]);
+  }, [interactableId, updateInteractableComponentProps, className]);
 
   // No visual UI required; tabs UI remains in page via ComponentsCanvas
   return <div className={className} aria-hidden />;
