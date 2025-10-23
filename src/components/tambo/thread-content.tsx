@@ -3,7 +3,9 @@
 import {
   Message,
   MessageContent,
+  MessageImages,
   MessageRenderedComponentArea,
+  ReasoningInfo,
   ToolcallInfo,
   type messageVariants,
 } from "@/components/tambo/message";
@@ -126,6 +128,10 @@ const ThreadContentMessages = React.forwardRef<
 >(({ className, ...props }, ref) => {
   const { messages, isGenerating, variant } = useThreadContentContext();
 
+  const filteredMessages = messages.filter(
+    (message) => message.role !== "system" && !message.parentMessageId,
+  );
+
   return (
     <div
       ref={ref}
@@ -133,7 +139,7 @@ const ThreadContentMessages = React.forwardRef<
       data-slot="thread-content-messages"
       {...props}
     >
-      {messages.map((message, index) => {
+      {filteredMessages.map((message, index) => {
         return (
           <div
             key={
@@ -148,7 +154,7 @@ const ThreadContentMessages = React.forwardRef<
               role={message.role === "assistant" ? "assistant" : "user"}
               message={message}
               variant={variant}
-              isLoading={isGenerating && index === messages.length - 1}
+              isLoading={isGenerating && index === filteredMessages.length - 1}
               className={cn(
                 "flex w-full",
                 message.role === "assistant" ? "justify-start" : "justify-end",
@@ -160,6 +166,8 @@ const ThreadContentMessages = React.forwardRef<
                   message.role === "assistant" ? "w-full" : "max-w-3xl",
                 )}
               >
+                <ReasoningInfo />
+                <MessageImages />
                 <MessageContent
                   className={
                     message.role === "assistant"
