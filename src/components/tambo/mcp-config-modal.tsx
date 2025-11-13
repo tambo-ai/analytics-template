@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@radix-ui/react-dropdown-menu";
 import { createMarkdownComponents } from "@/components/tambo/markdown-components";
-import { Streamdown } from "streamdown";
+import Markdown from "react-markdown";
 import { cn } from "@/lib/utils";
 
 /**
@@ -219,9 +219,9 @@ function MyApp() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                <Streamdown components={createMarkdownComponents()}>
+                <Markdown components={createMarkdownComponents()}>
                   {instructions}
-                </Streamdown>
+                </Markdown>
               </motion.div>
             )}
           </div>

@@ -9,7 +9,7 @@ import "highlight.js/styles/github.css";
 import DOMPurify from "dompurify";
 
 /**
- * Markdown Components for Streamdown
+ * Markdown Components for React-Markdown
  *
  * This module provides customized components for rendering markdown content with syntax highlighting.
  * It uses highlight.js for code syntax highlighting and supports streaming content updates.
@@ -17,11 +17,11 @@ import DOMPurify from "dompurify";
  * @example
  * ```tsx
  * import { createMarkdownComponents } from './markdown-components';
- * import { Streamdown } from 'streamdown';
+ * import ReactMarkdown from 'react-markdown';
  *
  * const MarkdownRenderer = ({ content }) => {
- *   const components = createMarkdownComponents();
- *   return <Streamdown components={components}>{content}</Streamdown>;
+ *   const components = createMarkdownComponents('light');
+ *   return <ReactMarkdown components={components}>{content}</ReactMarkdown>;
  * };
  * ```
  */
@@ -86,8 +86,9 @@ const CodeHeader = ({
 };
 
 /**
- * Creates a set of components for use with streamdown
- * @returns Components object for streamdown
+ * Creates a set of components for use with react-markdown
+ * @param theme - The theme to use ('light' or 'dark')
+ * @returns Components object for react-markdown
  */
 export const createMarkdownComponents = (): Components => ({
   code: function Code({ className, children, ...props }) {

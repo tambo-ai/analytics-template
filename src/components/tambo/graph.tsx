@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { useTambo, useTamboMessageContext } from "@tambo-ai/react";
 import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 import * as RechartsCore from "recharts";
@@ -123,8 +124,29 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
     { className, variant, size, data, title, showLegend = true, ...props },
     ref,
   ) => {
-    // If no data received yet, show loading
-    if (!data) {
+    // Get thread state
+    const { thread } = useTambo();
+    const { messageId } = useTamboMessageContext();
+
+    const message = thread?.messages[thread?.messages.length - 1];
+
+    const isLatestMessage = message?.id === messageId;
+
+    const generationStage = thread?.generationStage;
+    const isGenerating =
+      generationStage &&
+      generationStage !== "COMPLETE" &&
+      generationStage !== "ERROR";
+
+    const dataIsValid =
+      data?.labels &&
+      data.datasets &&
+      Array.isArray(data.labels) &&
+      Array.isArray(data.datasets);
+
+    // For non-latest messages, show the graph immediately if data is valid
+    // For latest message, only show loading state while generating
+    if (!dataIsValid || (isLatestMessage && isGenerating)) {
       return (
         <div
           ref={ref}
@@ -138,50 +160,33 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
                 <span className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:-0.2s]"></span>
                 <span className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:-0.1s]"></span>
               </div>
-              <span className="text-sm">Awaiting data...</span>
+              <span className="text-sm">
+                {isGenerating
+                  ? "Streaming data..."
+                  : data
+                    ? "Data ready"
+                    : "Awaiting data"}
+              </span>
             </div>
           </div>
         </div>
       );
     }
 
-    // Check if we have the minimum viable data structure
-    const hasValidStructure =
-      data.type &&
-      data.labels &&
-      data.datasets &&
-      Array.isArray(data.labels) &&
-      Array.isArray(data.datasets) &&
-      data.labels.length > 0 &&
-      data.datasets.length > 0;
-
-    if (!hasValidStructure) {
-      return (
-        <div
-          ref={ref}
-          className={cn(graphVariants({ variant, size }), className)}
-          {...props}
-        >
-          <div className="p-4 h-full flex items-center justify-center">
-            <div className="text-muted-foreground text-center">
-              <p className="text-sm">Building chart...</p>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
+    // If not generating and basic structure exists, proceed with detailed validation and rendering
     try {
-      // Filter datasets to only include those with valid data
-      const validDatasets = data.datasets.filter(
-        (dataset) =>
-          dataset.label &&
-          dataset.data &&
-          Array.isArray(dataset.data) &&
-          dataset.data.length > 0,
-      );
-
-      if (validDatasets.length === 0) {
+      // Check for invalid data structure *only after* generation should be complete
+      if (
+        data.datasets.some(
+          (dataset) =>
+            !dataset.label ||
+            !dataset.data ||
+            !Array.isArray(dataset.data) ||
+            dataset.data.length !== data.labels.length,
+        )
+      ) {
+        console.error("Invalid graph data structure (post-generation):", data);
+        // Render a specific error for invalid structure after completion
         return (
           <div
             ref={ref}
@@ -189,39 +194,35 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
             {...props}
           >
             <div className="p-4 h-full flex items-center justify-center">
-              <div className="text-muted-foreground text-center">
-                <p className="text-sm">Preparing datasets...</p>
+              <div className="text-destructive text-center">
+                <p className="font-medium">Invalid Graph Data</p>
+                <p className="text-sm mt-1">
+                  The final data structure is invalid.
+                </p>
               </div>
             </div>
           </div>
         );
       }
 
-      // Use the minimum length between labels and the shortest dataset
-      const maxDataPoints = Math.min(
-        data.labels.length,
-        Math.min(...validDatasets.map((d) => d.data.length)),
-      );
-
-      // Transform data for Recharts using only available data points
-      const chartData = data.labels
-        .slice(0, maxDataPoints)
-        .map((label, index) => ({
-          name: label,
-          ...Object.fromEntries(
-            validDatasets.map((dataset) => [
-              dataset.label,
-              dataset.data[index] ?? 0,
-            ]),
-          ),
-        }));
+      // Transform data for Recharts (only if structure is valid post-generation)
+      const chartData = data.labels.map((label, index) => ({
+        name: label,
+        ...Object.fromEntries(
+          data.datasets.map((dataset) => [dataset.label, dataset.data[index]]),
+        ),
+      }));
 
       const renderChart = () => {
-        if (!["bar", "line", "pie"].includes(data.type)) {
+        if (!data.type || !["bar", "line", "pie"].includes(data.type)) {
+          console.error("Invalid chart type:", data.type);
           return (
             <div className="h-full flex items-center justify-center">
-              <div className="text-muted-foreground text-center">
-                <p className="text-sm">Unsupported chart type: {data.type}</p>
+              <div className="text-destructive text-center">
+                <p className="font-medium">Error loading chart</p>
+                <p className="text-sm mt-1">
+                  Invalid chart type. Supported types are: bar, line, pie
+                </p>
               </div>
             </div>
           );
@@ -234,40 +235,40 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
                 <RechartsCore.CartesianGrid
                   strokeDasharray="3 3"
                   vertical={false}
-                  stroke="hsl(var(--border))"
+                  stroke="var(--border)"
                 />
                 <RechartsCore.XAxis
                   dataKey="name"
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   axisLine={false}
                   tickLine={false}
                 />
                 <RechartsCore.YAxis
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   axisLine={false}
                   tickLine={false}
                 />
                 <RechartsCore.Tooltip
                   cursor={{
-                    fill: "hsl(var(--muted-foreground))",
-                    fillOpacity: 0.1,
+                    fill: "var(--muted)",
+                    fillOpacity: 0.3,
                     radius: 4,
                   }}
                   contentStyle={{
-                    backgroundColor: "white",
-                    border: "1px solid #e5e7eb",
+                    backgroundColor: "var(--background)",
+                    border: "1px solid var(--border)",
                     borderRadius: "var(--radius)",
-                    color: "hsl(var(--foreground))",
+                    color: "var(--foreground)",
                   }}
                 />
                 {showLegend && (
                   <RechartsCore.Legend
                     wrapperStyle={{
-                      color: "hsl(var(--foreground))",
+                      color: "var(--foreground)",
                     }}
                   />
                 )}
-                {validDatasets.map((dataset, index) => (
+                {data.datasets.map((dataset, index) => (
                   <RechartsCore.Bar
                     key={dataset.label}
                     dataKey={dataset.label}
@@ -287,40 +288,40 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
                 <RechartsCore.CartesianGrid
                   strokeDasharray="3 3"
                   vertical={false}
-                  stroke="hsl(var(--border))"
+                  stroke="var(--border)"
                 />
                 <RechartsCore.XAxis
                   dataKey="name"
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   axisLine={false}
                   tickLine={false}
                 />
                 <RechartsCore.YAxis
-                  stroke="hsl(var(--muted-foreground))"
+                  stroke="var(--muted-foreground)"
                   axisLine={false}
                   tickLine={false}
                 />
                 <RechartsCore.Tooltip
                   cursor={{
-                    stroke: "hsl(var(--muted))",
+                    stroke: "var(--muted)",
                     strokeWidth: 2,
                     strokeOpacity: 0.3,
                   }}
                   contentStyle={{
-                    backgroundColor: "white",
-                    border: "1px solid #e5e7eb",
+                    backgroundColor: "var(--background)",
+                    border: "1px solid var(--border)",
                     borderRadius: "var(--radius)",
-                    color: "hsl(var(--foreground))",
+                    color: "var(--foreground)",
                   }}
                 />
                 {showLegend && (
                   <RechartsCore.Legend
                     wrapperStyle={{
-                      color: "hsl(var(--foreground))",
+                      color: "var(--foreground)",
                     }}
                   />
                 )}
-                {validDatasets.map((dataset, index) => (
+                {data.datasets.map((dataset, index) => (
                   <RechartsCore.Line
                     key={dataset.label}
                     type="monotone"
@@ -335,29 +336,15 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
               </RechartsCore.LineChart>
             );
 
-          case "pie": {
-            // For pie charts, use the first valid dataset
-            const pieDataset = validDatasets[0];
-            if (!pieDataset) {
-              return (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-muted-foreground text-center">
-                    <p className="text-sm">No valid dataset for pie chart</p>
-                  </div>
-                </div>
-              );
-            }
-
+          case "pie":
             return (
               <RechartsCore.PieChart>
                 <RechartsCore.Pie
-                  data={pieDataset.data
-                    .slice(0, maxDataPoints)
-                    .map((value, index) => ({
-                      name: data.labels[index],
-                      value,
-                      fill: defaultColors[index % defaultColors.length],
-                    }))}
+                  data={data.datasets[0].data.map((value, index) => ({
+                    name: data.labels[index],
+                    value,
+                    fill: defaultColors[index % defaultColors.length],
+                  }))}
                   dataKey="value"
                   nameKey="name"
                   cx="50%"
@@ -368,29 +355,28 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
                 />
                 <RechartsCore.Tooltip
                   contentStyle={{
-                    backgroundColor: "white",
-                    border: "1px solid #e5e7eb",
+                    backgroundColor: "var(--background)",
+                    border: "1px solid var(--border)",
                     borderRadius: "var(--radius)",
-                    color: "hsl(var(--foreground))",
+                    color: "var(--foreground)",
                     boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
                   }}
                   itemStyle={{
-                    color: "hsl(var(--foreground))",
+                    color: "var(--foreground)",
                   }}
                   labelStyle={{
-                    color: "hsl(var(--foreground))",
+                    color: "var(--foreground)",
                   }}
                 />
                 {showLegend && (
                   <RechartsCore.Legend
                     wrapperStyle={{
-                      color: "hsl(var(--foreground))",
+                      color: "var(--foreground)",
                     }}
                   />
                 )}
               </RechartsCore.PieChart>
             );
-          }
         }
       };
 
@@ -425,7 +411,8 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
             <div className="text-destructive text-center">
               <p className="font-medium">Error loading chart</p>
               <p className="text-sm mt-1">
-                An error occurred while rendering. Please try again.
+                An error occurred while transforming data. Please try again
+                later.
               </p>
             </div>
           </div>
