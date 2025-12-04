@@ -20,8 +20,9 @@ export default function Home() {
         tamboUrl={process.env.NEXT_PUBLIC_TAMBO_URL!}
         components={components}
         tools={tools}
+        mcpServers={mcpServers}
       >
-        <TamboMcpProvider mcpServers={mcpServers}>
+        <TamboMcpProvider>
           <div className="flex h-full overflow-hidden">
             <div className="flex-1 overflow-hidden">
               <MessageThreadFull contextKey="tambo-template" />

@@ -3,7 +3,9 @@
 import {
   Message,
   MessageContent,
+  MessageImages,
   MessageRenderedComponentArea,
+  ReasoningInfo,
   ToolcallInfo,
   type messageVariants,
 } from "@/components/tambo/message";
@@ -53,8 +55,7 @@ const useThreadContentContext = () => {
  * Props for the ThreadContent component.
  * Extends standard HTMLDivElement attributes.
  */
-export interface ThreadContentProps
-  extends React.HTMLAttributes<HTMLDivElement> {
+export interface ThreadContentProps extends React.HTMLAttributes<HTMLDivElement> {
   /** Optional styling variant for the message container */
   variant?: VariantProps<typeof messageVariants>["variant"];
   /** The child elements to render within the container. */
@@ -126,6 +127,10 @@ const ThreadContentMessages = React.forwardRef<
 >(({ className, ...props }, ref) => {
   const { messages, isGenerating, variant } = useThreadContentContext();
 
+  const filteredMessages = messages.filter(
+    (message) => message.role !== "system" && !message.parentMessageId,
+  );
+
   return (
     <div
       ref={ref}
@@ -133,14 +138,12 @@ const ThreadContentMessages = React.forwardRef<
       data-slot="thread-content-messages"
       {...props}
     >
-      {messages.map((message, index) => {
+      {filteredMessages.map((message, index) => {
         return (
           <div
             key={
               message.id ??
-              `${message.role}-${
-                message.createdAt ?? Date.now()
-              }-${message.content?.toString().substring(0, 10)}`
+              `${message.role}-${message.createdAt ?? `${index}`}-${message.content?.toString().substring(0, 10)}`
             }
             data-slot="thread-content-item"
           >
@@ -148,7 +151,7 @@ const ThreadContentMessages = React.forwardRef<
               role={message.role === "assistant" ? "assistant" : "user"}
               message={message}
               variant={variant}
-              isLoading={isGenerating && index === messages.length - 1}
+              isLoading={isGenerating && index === filteredMessages.length - 1}
               className={cn(
                 "flex w-full",
                 message.role === "assistant" ? "justify-start" : "justify-end",
@@ -160,11 +163,13 @@ const ThreadContentMessages = React.forwardRef<
                   message.role === "assistant" ? "w-full" : "max-w-3xl",
                 )}
               >
+                <ReasoningInfo />
+                <MessageImages />
                 <MessageContent
                   className={
                     message.role === "assistant"
-                      ? "text-primary font-sans"
-                      : "text-primary bg-container hover:bg-backdrop font-sans"
+                      ? "text-foreground font-sans"
+                      : "text-foreground bg-container hover:bg-backdrop font-sans"
                   }
                 />
                 <ToolcallInfo />

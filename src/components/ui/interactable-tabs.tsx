@@ -36,6 +36,13 @@ function TabsWrapper(props: TabsProps) {
   const applyingRef = useRef(false);
   const lastEmittedKeyRef = useRef("");
 
+  // Use ref to avoid infinite re-render loops when interactableComponents changes
+  const interactableComponentsRef = useRef(interactableComponents);
+  interactableComponentsRef.current = interactableComponents;
+
+  // Ref to track if we've done initial publish
+  const hasPublishedInitialRef = useRef(false);
+
   // Inbound: reconcile tabs only (ids, names, order, add/remove) and activeCanvasId
   useEffect(() => {
     if (!state) return;
@@ -74,29 +81,43 @@ function TabsWrapper(props: TabsProps) {
     }, 0);
   }, [state]);
 
-  // Outbound: emit tabs slice (ids, names) and activeCanvasId
-  useEffect(() => {
-    const unsubscribe = useCanvasStore.subscribe((s) => {
-      if (applyingRef.current) return;
-      const payload = {
-        canvases: s.canvases.map((c) => ({ id: c.id, name: c.name })),
-        activeCanvasId: s.activeCanvasId,
-      };
-      const key = JSON.stringify(payload);
-      if (key === lastEmittedKeyRef.current) return;
-      lastEmittedKeyRef.current = key;
-      onPropsUpdate?.({ state: payload, className });
-      if (interactableId) {
-        const match = interactableComponents.find(
-          (c) => c.props?.interactableId === interactableId,
-        );
-        if (match) {
-          updateInteractableComponentProps(match.id, {
-            state: payload,
-            className,
-          });
-        }
+  // Helper to build tabs payload
+  const buildTabsPayload = () => {
+    const s = useCanvasStore.getState();
+    return {
+      canvases: s.canvases.map((c) => ({ id: c.id, name: c.name })),
+      activeCanvasId: s.activeCanvasId,
+    };
+  };
+
+  // Helper to publish payload
+  const publishPayload = (payload: {
+    canvases: { id: string; name: string }[];
+    activeCanvasId: string | null;
+  }) => {
+    const key = JSON.stringify(payload);
+    if (key === lastEmittedKeyRef.current) return;
+    lastEmittedKeyRef.current = key;
+    onPropsUpdate?.({ state: payload, className });
+    if (interactableId) {
+      const match = interactableComponentsRef.current.find(
+        (c) => c.props?.interactableId === interactableId,
+      );
+      if (match) {
+        updateInteractableComponentProps(match.id, {
+          state: payload,
+          className,
+        });
       }
+    }
+  };
+
+  // Outbound: emit tabs slice (ids, names) and activeCanvasId on store changes
+  useEffect(() => {
+    const unsubscribe = useCanvasStore.subscribe(() => {
+      if (applyingRef.current) return;
+      const payload = buildTabsPayload();
+      publishPayload(payload);
     });
     return () => unsubscribe();
   }, [
@@ -104,48 +125,43 @@ function TabsWrapper(props: TabsProps) {
     updateInteractableComponentProps,
     interactableId,
     className,
-    interactableComponents,
   ]);
 
-  // Initial publish
+  // Initial publish: poll until interactable components are registered
   useEffect(() => {
-    const s = useCanvasStore.getState();
-    const initial = {
-      canvases: s.canvases.map((c) => ({ id: c.id, name: c.name })),
-      activeCanvasId: s.activeCanvasId,
-    };
-    const key = JSON.stringify(initial);
-    lastEmittedKeyRef.current = key;
-    onPropsUpdate?.({ state: initial, className });
-    if (interactableId) {
-      updateInteractableComponentProps(interactableId, { state: initial });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [className, interactableId, updateInteractableComponentProps]);
+    if (hasPublishedInitialRef.current) return;
 
-  // Resolve runtime id and publish snapshot
-  useEffect(() => {
-    if (!interactableId) return;
-    const match = interactableComponents.find(
-      (c) => c.props?.interactableId === interactableId,
-    );
-    if (!match) return;
-    const s = useCanvasStore.getState();
-    const snapshot = {
-      canvases: s.canvases.map((c) => ({ id: c.id, name: c.name })),
-      activeCanvasId: s.activeCanvasId,
+    const tryPublishInitial = () => {
+      if (hasPublishedInitialRef.current) return true;
+      if (interactableComponentsRef.current.length > 0) {
+        const payload = buildTabsPayload();
+        publishPayload(payload);
+        hasPublishedInitialRef.current = true;
+        return true;
+      }
+      return false;
     };
-    updateInteractableComponentProps(match.id, {
-      state: snapshot,
-      className,
-    });
-    lastEmittedKeyRef.current = JSON.stringify(snapshot);
-  }, [
-    interactableComponents,
-    interactableId,
-    updateInteractableComponentProps,
-    className,
-  ]);
+
+    // Try immediately
+    if (tryPublishInitial()) return;
+
+    // Poll a few times to catch when components are registered
+    const intervalId = setInterval(() => {
+      if (tryPublishInitial()) {
+        clearInterval(intervalId);
+      }
+    }, 50);
+
+    // Clean up after 1 second max
+    const timeoutId = setTimeout(() => {
+      clearInterval(intervalId);
+    }, 1000);
+
+    return () => {
+      clearInterval(intervalId);
+      clearTimeout(timeoutId);
+    };
+  }, []);
 
   // No visual UI required; tabs UI remains in page via ComponentsCanvas
   return <div className={className} aria-hidden />;

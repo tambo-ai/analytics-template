@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import type { Components } from "react-markdown";
 import { Copy, Check, ExternalLink } from "lucide-react";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
@@ -62,14 +61,14 @@ const CodeHeader = ({
 
   const copyToClipboard = () => {
     if (!code) return;
-    navigator.clipboard.writeText(code);
+    void navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <div className="flex items-center justify-between gap-4 rounded-t-md bg-container px-4 py-2 text-sm font-semibold text-primary">
-      <span className="lowercase text-primary">{language}</span>
+    <div className="flex items-center justify-between gap-4 rounded-t-md bg-container px-4 py-2 text-sm font-semibold text-foreground">
+      <span className="lowercase text-muted-foreground">{language}</span>
       <button
         onClick={copyToClipboard}
         className="p-1 rounded-md hover:bg-backdrop transition-colors cursor-pointer"
@@ -89,7 +88,11 @@ const CodeHeader = ({
  * Creates a set of components for use with streamdown
  * @returns Components object for streamdown
  */
-export const createMarkdownComponents = (): Components => ({
+export const createMarkdownComponents = (): Record<
+  string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  React.ComponentType<any>
+> => ({
   code: function Code({ className, children, ...props }) {
     const match = /language-(\w+)/.exec(className ?? "");
     const content = String(children).replace(/\n$/, "");
@@ -214,9 +217,9 @@ export const createMarkdownComponents = (): Components => ({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-primary font-medium px-1.5 py-0.5 rounded-md bg-primary/5 hover:bg-primary/10 hover:underline transition-colors inline-flex items-center gap-1.5"
+      className="inline-flex items-center gap-1.5 text-foreground underline underline-offset-4 decoration-muted-foreground hover:text-foreground hover:decoration-foreground transition-colors"
     >
-      {children}
+      <span>{children}</span>
       <ExternalLink className="w-3 h-3" />
     </a>
   ),
@@ -255,3 +258,8 @@ export const createMarkdownComponents = (): Components => ({
     <td className="border border-border px-4 py-2">{children}</td>
   ),
 });
+
+/**
+ * Pre-created markdown components instance for use across the application.
+ */
+export const markdownComponents = createMarkdownComponents();
