@@ -39,6 +39,10 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
   const applyingRef = useRef(false);
   const lastEmittedKeyRef = useRef("");
 
+  // Use ref to avoid infinite re-render loops when interactableComponents changes
+  const interactableComponentsRef = useRef(interactableComponents);
+  interactableComponentsRef.current = interactableComponents;
+
   // Inbound: apply edits to active canvas
   useEffect(() => {
     if (!state) return;
@@ -88,42 +92,56 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
     }, 0);
   }, [state]);
 
-  // Outbound: publish simplified charts snapshot for active canvas
-  useEffect(() => {
-    const unsubscribe = useCanvasStore.subscribe((s) => {
-      if (applyingRef.current) return;
-      const active = s.activeCanvasId
-        ? s.canvases.find((c) => c.id === s.activeCanvasId)
-        : undefined;
-      const charts = (active?.components || [])
-        .filter((c) => c._componentType === "Graph")
-        .map((c) => ({
-          id: c.componentId,
-          title:
-            (c as { title?: string }).title ??
-            (c as { data?: { title?: string } }).data?.title ??
-            "",
-          type: ((c as { data?: { type?: string } }).data?.type ?? "bar") as
-            | "bar"
-            | "line"
-            | "pie",
-        }));
-      const payload = { charts };
-      const key = JSON.stringify(payload);
-      if (key === lastEmittedKeyRef.current) return;
-      lastEmittedKeyRef.current = key;
-      onPropsUpdate?.({ state: payload, className });
-      if (interactableId) {
-        const match = interactableComponents.find(
-          (c) => c.props?.interactableId === interactableId,
-        );
-        if (match) {
-          updateInteractableComponentProps(match.id, {
-            state: payload,
-            className,
-          });
-        }
+  // Helper to build charts payload
+  const buildChartsPayload = () => {
+    const s = useCanvasStore.getState();
+    const active = s.activeCanvasId
+      ? s.canvases.find((c) => c.id === s.activeCanvasId)
+      : undefined;
+    const charts = (active?.components || [])
+      .filter((c) => c._componentType === "Graph")
+      .map((c) => ({
+        id: c.componentId,
+        title:
+          (c as { title?: string }).title ??
+          (c as { data?: { title?: string } }).data?.title ??
+          "",
+        type: ((c as { data?: { type?: string } }).data?.type ?? "bar") as
+          | "bar"
+          | "line"
+          | "pie",
+      }));
+    return { charts };
+  };
+
+  // Ref to track if we've done initial publish
+  const hasPublishedInitialRef = useRef(false);
+
+  // Helper to publish payload
+  const publishPayload = (payload: { charts: { id: string; title: string; type: "bar" | "line" | "pie" }[] }) => {
+    const key = JSON.stringify(payload);
+    if (key === lastEmittedKeyRef.current) return;
+    lastEmittedKeyRef.current = key;
+    onPropsUpdate?.({ state: payload, className });
+    if (interactableId) {
+      const match = interactableComponentsRef.current.find(
+        (c) => c.props?.interactableId === interactableId,
+      );
+      if (match) {
+        updateInteractableComponentProps(match.id, {
+          state: payload,
+          className,
+        });
       }
+    }
+  };
+
+  // Outbound: publish simplified charts snapshot for active canvas on store changes
+  useEffect(() => {
+    const unsubscribe = useCanvasStore.subscribe(() => {
+      if (applyingRef.current) return;
+      const payload = buildChartsPayload();
+      publishPayload(payload);
     });
     return () => unsubscribe();
   }, [
@@ -131,8 +149,43 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
     updateInteractableComponentProps,
     interactableId,
     className,
-    interactableComponents,
   ]);
+
+  // Initial publish: poll until interactable components are registered
+  useEffect(() => {
+    if (hasPublishedInitialRef.current) return;
+
+    const tryPublishInitial = () => {
+      if (hasPublishedInitialRef.current) return true;
+      if (interactableComponentsRef.current.length > 0) {
+        const payload = buildChartsPayload();
+        publishPayload(payload);
+        hasPublishedInitialRef.current = true;
+        return true;
+      }
+      return false;
+    };
+
+    // Try immediately
+    if (tryPublishInitial()) return;
+
+    // Poll a few times to catch when components are registered
+    const intervalId = setInterval(() => {
+      if (tryPublishInitial()) {
+        clearInterval(intervalId);
+      }
+    }, 50);
+
+    // Clean up after 1 second max
+    const timeoutId = setTimeout(() => {
+      clearInterval(intervalId);
+    }, 1000);
+
+    return () => {
+      clearInterval(intervalId);
+      clearTimeout(timeoutId);
+    };
+  }, []);
 
   // Minimal UI (hidden content is fine; needs to be rendered for MCP)
   return (

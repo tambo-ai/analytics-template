@@ -75,3 +75,14 @@ AI can manipulate canvases through tools in `src/tools/canvas-tools.ts`:
 - `getCanvasComponents(id)` - Get components in canvas
 
 Note: Update/delete canvas tools are commented out due to schema validation issues with Tambo.
+
+
+
+<!-- tambo-docs-v1.0 -->
+## Tambo AI Framework
+
+This project uses **Tambo AI** for building AI assistants with generative UI and MCP support.
+
+**Documentation**: https://docs.tambo.co/llms.txt
+
+**CLI**: Use `npx tambo` to add UI components or upgrade. Run `npx tambo help` to learn more.

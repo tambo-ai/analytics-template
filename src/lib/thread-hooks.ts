@@ -1,30 +1,65 @@
+import type { TamboThreadMessage } from "@tambo-ai/react";
 import * as React from "react";
 import { useEffect, useState } from "react";
-import type { TamboThreadMessage } from "@tambo-ai/react";
 
 /**
  * Custom hook to merge multiple refs into one callback ref
  * @param refs - Array of refs to merge
  * @returns A callback ref that updates all provided refs
  */
-export function useMergedRef<T>(...refs: React.Ref<T>[]) {
-  return React.useCallback(
-    (element: T) => {
-      for (const ref of refs) {
-        if (!ref) continue;
+export function useMergeRefs<Instance>(
+  ...refs: (React.Ref<Instance> | undefined)[]
+): null | React.RefCallback<Instance> {
+  const cleanupRef = React.useRef<void | (() => void)>(undefined);
 
-        if (typeof ref === "function") {
-          ref(element);
-        } else {
-          // This cast is safe because we're just updating the .current property
-          (ref as React.MutableRefObject<T>).current = element;
-        }
+  const refEffect = React.useCallback((instance: Instance | null) => {
+    const cleanups = refs.map((ref) => {
+      if (ref == null) {
+        return;
       }
-    },
-    [refs],
-  );
-}
 
+      if (typeof ref === "function") {
+        const refCallback = ref;
+        const refCleanup: void | (() => void) = refCallback(instance);
+        return typeof refCleanup === "function"
+          ? refCleanup
+          : () => {
+              refCallback(null);
+            };
+      }
+
+      (ref as React.MutableRefObject<Instance | null>).current = instance;
+      return () => {
+        (ref as React.MutableRefObject<Instance | null>).current = null;
+      };
+    });
+
+    return () => {
+      cleanups.forEach((refCleanup) => refCleanup?.());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, refs);
+
+  return React.useMemo(() => {
+    if (refs.every((ref) => ref == null)) {
+      return null;
+    }
+
+    return (value) => {
+      if (cleanupRef.current) {
+        cleanupRef.current();
+        (cleanupRef as React.MutableRefObject<void | (() => void)>).current =
+          undefined;
+      }
+
+      if (value != null) {
+        (cleanupRef as React.MutableRefObject<void | (() => void)>).current =
+          refEffect(value);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refEffect, ...refs]);
+}
 /**
  * Custom hook to detect canvas space presence and position
  * @param elementRef - Reference to the component to compare position with
@@ -92,18 +127,21 @@ export function usePositioning(
   // If panel has right class, history should be on right
   // If canvas is on left, history should be on right
   // Otherwise, history should be on left
-  const historyPosition: "left" | "right" = isRightClass
-    ? "right"
-    : hasCanvasSpace && canvasIsOnLeft
-      ? "right"
-      : "left";
+  let historyPosition: "left" | "right";
+  if (isRightClass) {
+    historyPosition = "right";
+  } else if (hasCanvasSpace && canvasIsOnLeft) {
+    historyPosition = "right";
+  } else {
+    historyPosition = "left";
+  }
 
   return { isLeftPanel, historyPosition };
 }
 
 /**
  * Converts message content into a safely renderable format.
- * Primarily joins text blocks from arrays into a single string.
+ * Handles text, resource references, and other content types.
  * @param content - The message content (string, element, array, etc.)
  * @returns A renderable string or React element.
  */
@@ -114,10 +152,20 @@ export function getSafeContent(
   if (typeof content === "string") return content;
   if (React.isValidElement(content)) return content; // Pass elements through
   if (Array.isArray(content)) {
-    // Filter out non-text items and join text
-    return content
-      .map((item) => (item && item.type === "text" ? (item.text ?? "") : ""))
-      .join("");
+    // Map content parts to strings, including resource references
+    const parts: string[] = [];
+    for (const item of content) {
+      if (item?.type === "text") {
+        parts.push(item.text ?? "");
+      } else if (item?.type === "resource") {
+        // Format resource references as @uri (uri already contains serverKey prefix if applicable)
+        const uri = item.resource?.uri;
+        if (uri) {
+          parts.push(`@${uri}`);
+        }
+      }
+    }
+    return parts.join(" ");
   }
   // Handle potential edge cases or unknown types
   // console.warn("getSafeContent encountered unknown content type:", content);
@@ -125,7 +173,36 @@ export function getSafeContent(
 }
 
 /**
- * Checks if message content contains meaningful, non-empty text.
+ * Checks if a content item has meaningful data.
+ * @param item - A content item from the message
+ * @returns True if the item has content, false otherwise.
+ */
+function hasContentInItem(item: unknown): boolean {
+  if (!item || typeof item !== "object") {
+    return false;
+  }
+
+  const typedItem = item as {
+    type?: string;
+    text?: string;
+    image_url?: { url?: string };
+  };
+
+  // Check for text content
+  if (typedItem.type === "text") {
+    return !!typedItem.text?.trim();
+  }
+
+  // Check for image content
+  if (typedItem.type === "image_url") {
+    return !!typedItem.image_url?.url;
+  }
+
+  return false;
+}
+
+/**
+ * Checks if message content contains meaningful, non-empty text or images.
  * @param content - The message content (string, element, array, etc.)
  * @returns True if there is content, false otherwise.
  */
@@ -136,13 +213,22 @@ export function checkHasContent(
   if (typeof content === "string") return content.trim().length > 0;
   if (React.isValidElement(content)) return true; // Assume elements have content
   if (Array.isArray(content)) {
-    return content.some(
-      (item) =>
-        item &&
-        item.type === "text" &&
-        typeof item.text === "string" &&
-        item.text.trim().length > 0,
-    );
+    return content.some(hasContentInItem);
   }
   return false; // Default for unknown types
+}
+
+/**
+ * Extracts image URLs from message content array.
+ * @param content - Array of content items
+ * @returns Array of image URLs
+ */
+export function getMessageImages(
+  content: { type?: string; image_url?: { url?: string } }[] | undefined | null,
+): string[] {
+  if (!content) return [];
+
+  return content
+    .filter((item) => item?.type === "image_url" && item.image_url?.url)
+    .map((item) => item.image_url!.url!);
 }
