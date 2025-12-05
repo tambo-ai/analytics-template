@@ -873,6 +873,14 @@ function extractComponentInfo(renderedComponent: React.ReactNode): {
 }
 
 /**
+ * Check if a component type supports drag/drop to canvas
+ * Only Graph components should be draggable to the canvas
+ */
+function isDraggableComponent(componentType: string): boolean {
+  return componentType === "Graph";
+}
+
+/**
  * Displays the `renderedComponent` associated with an assistant message.
  * Shows a button to view in canvas if a canvas space exists, otherwise renders inline.
  * Only renders if the message role is 'assistant' and `message.renderedComponent` exists.
@@ -886,11 +894,14 @@ const MessageRenderedComponentArea = React.forwardRef<
   const [canvasExists, setCanvasExists] = React.useState(false);
   const { addComponent, activeCanvasId, createCanvas } = useCanvasStore();
 
-  const addToDashboard = React.useCallback(() => {
-    const { componentType, componentProps } = extractComponentInfo(
-      message.renderedComponent,
-    );
+  // Extract component info once to check if it's draggable
+  const { componentType, componentProps } = React.useMemo(
+    () => extractComponentInfo(message.renderedComponent),
+    [message.renderedComponent],
+  );
+  const canDrag = isDraggableComponent(componentType);
 
+  const addToDashboard = React.useCallback(() => {
     let targetCanvasId = activeCanvasId;
     if (!targetCanvasId) {
       const newCanvas = createCanvas();
@@ -906,14 +917,10 @@ const MessageRenderedComponentArea = React.forwardRef<
       _inCanvas: true,
       _componentType: componentType,
     });
-  }, [message.renderedComponent, activeCanvasId, addComponent, createCanvas]);
+  }, [componentType, componentProps, activeCanvasId, addComponent, createCanvas]);
 
   const handleDragStart = React.useCallback(
     (e: React.DragEvent<HTMLDivElement>) => {
-      const { componentType, componentProps } = extractComponentInfo(
-        message.renderedComponent,
-      );
-
       const dragData = {
         component: componentType,
         props: {
@@ -926,7 +933,7 @@ const MessageRenderedComponentArea = React.forwardRef<
       e.dataTransfer.setData("application/json", JSON.stringify(dragData));
       e.dataTransfer.effectAllowed = "copy";
     },
-    [message.renderedComponent],
+    [componentType, componentProps],
   );
 
   // Check if canvas exists on mount and window resize
@@ -964,7 +971,7 @@ const MessageRenderedComponentArea = React.forwardRef<
       {...props}
     >
       {children ??
-        (canvasExists ? (
+        (canvasExists && canDrag ? (
           <div className="flex items-center gap-3 pl-4">
             <button
               onClick={() => {
@@ -993,7 +1000,7 @@ const MessageRenderedComponentArea = React.forwardRef<
               Add to dashboard
             </button>
           </div>
-        ) : (
+        ) : canDrag ? (
           <div>
             <div className="flex justify-start pl-2">
               <button
@@ -1011,6 +1018,10 @@ const MessageRenderedComponentArea = React.forwardRef<
             >
               {message.renderedComponent}
             </div>
+          </div>
+        ) : (
+          <div className="w-full pt-2 px-2">
+            {message.renderedComponent}
           </div>
         ))}
     </div>

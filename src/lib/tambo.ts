@@ -9,7 +9,7 @@
  */
 
 import { Graph, graphSchema } from "@/components/tambo/graph";
-import { DataCard, dataCardSchema } from "@/components/ui/card-data";
+import { SelectForm, selectFormSchema } from "@/components/tambo/select-form";
 import type { TamboComponent } from "@tambo-ai/react";
 import { TamboTool } from "@tambo-ai/react";
 import { z } from "zod";
@@ -95,16 +95,16 @@ export const components: TamboComponent[] = [
   {
     name: "Graph",
     description:
-      "Use this when you want to display a chart. It supports bar, line, and pie charts. When you see data generally use this component.",
+      "Use this when you want to display a chart. It supports bar, line, and pie charts. When you see data generally use this component. IMPORTANT: When asked to create a graph, always generate it first in the chat - do NOT add it directly to the canvas/dashboard. Let the user decide if they want to add it.",
     component: Graph,
     propsSchema: graphSchema,
   },
   {
-    name: "DataCards",
+    name: "SelectForm",
     description:
-      "Use this when you want to display a list of information (>2 elements) that user might want to select from. Not anything that is a list or has links. ",
-    component: DataCard,
-    propsSchema: dataCardSchema,
+      "ALWAYS use this component instead of listing options as bullet points in text. Whenever you need to ask the user a question and would normally follow up with bullet points or numbered options, use this component instead. For yes/no or single-choice questions, use mode='single'. For questions where the user can select multiple options, use mode='multi' (default). Each group has a label (the question) and options (the choices). Examples: 'Would you like to continue?' with Yes/No options, or 'Which regions interest you?' with multiple region options.",
+    component: SelectForm,
+    propsSchema: selectFormSchema,
   },
   // Add more components here
 ];

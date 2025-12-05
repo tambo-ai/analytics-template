@@ -200,7 +200,7 @@ export const InteractableCanvasDetails = withInteractable(
   {
     componentName: "CanvasDetails",
     description:
-      "Active tab charts (Graph only). To edit charts, update 'state.charts' with desired order, titles, and types.",
+      "View and edit EXISTING charts on the active canvas tab (Graph only). You can ONLY update the chart name (title) and graph type (bar, line, pie) of charts that are already on the canvas. DO NOT use this to create new charts - to create a new chart, use the Graph component to generate it in chat first, then let the user add it to the canvas.",
     propsSchema: canvasDetailsPropsSchema,
   },
 );
