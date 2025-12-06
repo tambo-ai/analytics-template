@@ -166,8 +166,8 @@ const ResourceItemList = forwardRef<
 >(({ items, command }, ref) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  // Reset selection when items change
-  useEffect(() => setSelectedIndex(0), [items]);
+  // Ensure selectedIndex stays within bounds
+  const safeSelectedIndex = items.length > 0 ? Math.min(selectedIndex, items.length - 1) : 0;
 
   const navigate = (delta: number) =>
     setSelectedIndex((i) => (i + delta + items.length) % items.length);
@@ -178,7 +178,7 @@ const ResourceItemList = forwardRef<
       const handlers: Record<string, () => void> = {
         ArrowUp: () => navigate(-1),
         ArrowDown: () => navigate(1),
-        Enter: () => items[selectedIndex] && command(items[selectedIndex]),
+        Enter: () => items[safeSelectedIndex] && command(items[safeSelectedIndex]),
       };
       const handler = handlers[event.key];
       if (handler) {
@@ -206,7 +206,7 @@ const ResourceItemList = forwardRef<
           className={cn(
             "flex items-center gap-2 px-3 py-2 text-sm rounded-md text-left",
             "hover:bg-accent hover:text-accent-foreground transition-colors",
-            index === selectedIndex && "bg-accent text-accent-foreground",
+            index === safeSelectedIndex && "bg-accent text-accent-foreground",
           )}
           onClick={() => command(item)}
         >
@@ -552,6 +552,7 @@ export const TextEditor = React.forwardRef<HTMLDivElement, TextEditorProps>(
     const stableMenuOpenRef = React.useRef<boolean>(false);
     const commandRefs = React.useMemo(
       () =>
+        // eslint-disable-next-line react-hooks/refs -- Passing refs to config objects is intentional
         commands.map((cmd) => ({
           isMenuOpenRef: cmd.isMenuOpenRef ?? stableMenuOpenRef,
         })),
@@ -565,6 +566,7 @@ export const TextEditor = React.forwardRef<HTMLDivElement, TextEditorProps>(
         Paragraph,
         Text,
         Placeholder.configure({ placeholder }),
+        // eslint-disable-next-line react-hooks/refs -- Refs are passed to config, not read during render
         ...commands.map((cmd, index) => {
           const ref = commandRefs[index];
           return Mention.configure({

@@ -35,7 +35,7 @@ import {
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import * as React from "react";
-// eslint-disable-next-line @typescript-eslint/promise-function-async
+
 const DictationButton = dynamic(() => import("./dictation-button"), {
   ssr: false,
 });

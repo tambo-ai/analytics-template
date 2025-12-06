@@ -342,7 +342,8 @@ export interface McpResourceButtonProps extends React.ButtonHTMLAttributes<HTMLB
 export const McpResourceButton = React.forwardRef<
   HTMLButtonElement,
   McpResourceButtonProps
->(({ className, onInsertText, value: _value, ...props }, ref) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+>(({ className, onInsertText, value, ...props }, ref) => {
   const { data: resourceList, isLoading } = useTamboMcpResourceList();
   const [isOpen, setIsOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
