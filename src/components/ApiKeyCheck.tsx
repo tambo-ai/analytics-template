@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 interface ApiKeyCheckProps {
   children: React.ReactNode;
@@ -82,33 +82,25 @@ const CopyButton = ({ text }: { text: string }) => {
 };
 
 export function ApiKeyCheck({ children }: ApiKeyCheckProps) {
-  const [isApiKeyMissing, setIsApiKeyMissing] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_TAMBO_API_KEY) {
-      setIsApiKeyMissing(true);
-    } else {
-      setIsApiKeyMissing(false);
-    }
-  }, []);
+  // Compute API key status directly from the environment variable
+  // This is safe because NEXT_PUBLIC_* variables are inlined at build time
+  const isApiKeyMissing = !process.env.NEXT_PUBLIC_TAMBO_API_KEY;
 
   return (
     <div className="flex items-start gap-4">
       <div className="flex-grow">
         <div className="flex items-center gap-1">
           <div className="min-w-6">
-            {isApiKeyMissing === null ? "⏳" : isApiKeyMissing ? "❌" : "✅"}
+            {isApiKeyMissing ? "❌" : "✅"}
           </div>
           <p>
-            {isApiKeyMissing === null
-              ? "Checking setup..."
-              : isApiKeyMissing
-                ? "Tambo not initialized"
-                : "Tambo initialized"}
+            {isApiKeyMissing
+              ? "Tambo not initialized"
+              : "Tambo initialized"}
           </p>
         </div>
         {isApiKeyMissing && <ApiKeyMissingAlert />}
-        {isApiKeyMissing === false && children}
+        {!isApiKeyMissing && children}
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useCanvasStore } from "@/lib/canvas-storage";
 import { useTamboInteractable, withInteractable } from "@tambo-ai/react";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { z } from "zod";
 
 // Interactable that exposes/edit charts of the active canvas only
@@ -41,7 +41,9 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
 
   // Use ref to avoid infinite re-render loops when interactableComponents changes
   const interactableComponentsRef = useRef(interactableComponents);
-  interactableComponentsRef.current = interactableComponents;
+  useEffect(() => {
+    interactableComponentsRef.current = interactableComponents;
+  }, [interactableComponents]);
 
   // Inbound: apply edits to active canvas
   useEffect(() => {
@@ -118,7 +120,7 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
   const hasPublishedInitialRef = useRef(false);
 
   // Helper to publish payload
-  const publishPayload = (payload: { charts: { id: string; title: string; type: "bar" | "line" | "pie" }[] }) => {
+  const publishPayload = useCallback((payload: { charts: { id: string; title: string; type: "bar" | "line" | "pie" }[] }) => {
     const key = JSON.stringify(payload);
     if (key === lastEmittedKeyRef.current) return;
     lastEmittedKeyRef.current = key;
@@ -134,7 +136,7 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
         });
       }
     }
-  };
+  }, [onPropsUpdate, className, interactableId, updateInteractableComponentProps]);
 
   // Outbound: publish simplified charts snapshot for active canvas on store changes
   useEffect(() => {
@@ -144,12 +146,7 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
       publishPayload(payload);
     });
     return () => unsubscribe();
-  }, [
-    onPropsUpdate,
-    updateInteractableComponentProps,
-    interactableId,
-    className,
-  ]);
+  }, [publishPayload]);
 
   // Initial publish: poll until interactable components are registered
   useEffect(() => {
@@ -185,7 +182,7 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
       clearInterval(intervalId);
       clearTimeout(timeoutId);
     };
-  }, []);
+  }, [publishPayload]);
 
   // Minimal UI (hidden content is fine; needs to be rendered for MCP)
   return (

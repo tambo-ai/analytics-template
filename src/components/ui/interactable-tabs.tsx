@@ -3,7 +3,7 @@
 import type { Canvas, CanvasComponent } from "@/lib/canvas-storage";
 import { useCanvasStore } from "@/lib/canvas-storage";
 import { useTamboInteractable, withInteractable } from "@tambo-ai/react";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { z } from "zod";
 
 // Interactable: Tabs-only manager (ids, names, activeCanvasId)
@@ -38,7 +38,9 @@ function TabsWrapper(props: TabsProps) {
 
   // Use ref to avoid infinite re-render loops when interactableComponents changes
   const interactableComponentsRef = useRef(interactableComponents);
-  interactableComponentsRef.current = interactableComponents;
+  useEffect(() => {
+    interactableComponentsRef.current = interactableComponents;
+  }, [interactableComponents]);
 
   // Ref to track if we've done initial publish
   const hasPublishedInitialRef = useRef(false);
@@ -91,7 +93,7 @@ function TabsWrapper(props: TabsProps) {
   };
 
   // Helper to publish payload
-  const publishPayload = (payload: {
+  const publishPayload = useCallback((payload: {
     canvases: { id: string; name: string }[];
     activeCanvasId: string | null;
   }) => {
@@ -110,7 +112,7 @@ function TabsWrapper(props: TabsProps) {
         });
       }
     }
-  };
+  }, [onPropsUpdate, className, interactableId, updateInteractableComponentProps]);
 
   // Outbound: emit tabs slice (ids, names) and activeCanvasId on store changes
   useEffect(() => {
@@ -120,12 +122,7 @@ function TabsWrapper(props: TabsProps) {
       publishPayload(payload);
     });
     return () => unsubscribe();
-  }, [
-    onPropsUpdate,
-    updateInteractableComponentProps,
-    interactableId,
-    className,
-  ]);
+  }, [publishPayload]);
 
   // Initial publish: poll until interactable components are registered
   useEffect(() => {
@@ -161,7 +158,7 @@ function TabsWrapper(props: TabsProps) {
       clearInterval(intervalId);
       clearTimeout(timeoutId);
     };
-  }, []);
+  }, [publishPayload]);
 
   // No visual UI required; tabs UI remains in page via ComponentsCanvas
   return <div className={className} aria-hidden />;
