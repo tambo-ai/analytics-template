@@ -40,7 +40,7 @@ export const tools: TamboTool[] = [
           region: z.string().optional(),
           category: z.string().optional(),
         })
-        .optional(),
+        .default({}),
     ),
   },
   {
@@ -53,7 +53,7 @@ export const tools: TamboTool[] = [
         .object({
           category: z.string().optional(),
         })
-        .optional(),
+        .default({}),
     ),
   },
   {
@@ -66,7 +66,7 @@ export const tools: TamboTool[] = [
         .object({
           segment: z.string().optional(),
         })
-        .optional(),
+        .default({}),
     ),
   },
   {
@@ -79,7 +79,7 @@ export const tools: TamboTool[] = [
         .object({
           category: z.string().optional(),
         })
-        .optional(),
+        .default({}),
     ),
   },
 ];
