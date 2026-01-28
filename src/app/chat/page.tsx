@@ -7,7 +7,23 @@ import { InteractableTabs } from "@/components/ui/interactable-tabs";
 import { components, tools } from "@/lib/tambo";
 import { TamboProvider } from "@tambo-ai/react";
 import { TamboMcpProvider } from "@tambo-ai/react/mcp";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
+
+const STORAGE_KEY = "tambo-demo-context-key";
+
+function getContextKey(): string {
+  let key = localStorage.getItem(STORAGE_KEY);
+  if (!key) {
+    key = crypto.randomUUID();
+    localStorage.setItem(STORAGE_KEY, key);
+  }
+  return key;
+}
+
+function subscribe(callback: () => void): () => void {
+  window.addEventListener("storage", callback);
+  return () => window.removeEventListener("storage", callback);
+}
 
 /**
  * Gets or creates a unique context key for thread isolation.
@@ -20,20 +36,8 @@ import { useEffect, useState } from "react";
  *   const userToken = useUserToken(); // from your auth provider
  *   <TamboProvider userToken={userToken} ... />
  */
-function useContextKey() {
-  const [contextKey, setContextKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    const storageKey = "tambo-demo-context-key";
-    let key = localStorage.getItem(storageKey);
-    if (!key) {
-      key = crypto.randomUUID();
-      localStorage.setItem(storageKey, key);
-    }
-    setContextKey(key);
-  }, []);
-
-  return contextKey;
+function useContextKey(): string | null {
+  return useSyncExternalStore(subscribe, getContextKey, () => null);
 }
 
 export default function Home() {
