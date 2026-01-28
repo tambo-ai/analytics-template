@@ -14,7 +14,7 @@ import { useTambo } from "@tambo-ai/react";
 import type TamboAI from "@tambo-ai/typescript-sdk";
 import { cva, type VariantProps } from "class-variance-authority";
 import stringify from "json-stringify-pretty-compact";
-import { Check, ChevronDown, ExternalLink, Loader2, X } from "lucide-react";
+import { Check, ChevronDown, Loader2, X } from "lucide-react";
 import Image from "next/image";
 import * as React from "react";
 import { useState } from "react";
@@ -891,7 +891,6 @@ const MessageRenderedComponentArea = React.forwardRef<
   MessageRenderedComponentAreaProps
 >(({ className, children, ...props }, ref) => {
   const { message, role } = useMessageContext();
-  const [canvasExists, setCanvasExists] = React.useState(false);
   const { addComponent, activeCanvasId, createCanvas } = useCanvasStore();
 
   // Extract component info once to check if it's draggable
@@ -936,25 +935,6 @@ const MessageRenderedComponentArea = React.forwardRef<
     [componentType, componentProps],
   );
 
-  // Check if canvas exists on mount and window resize
-  React.useEffect(() => {
-    const checkCanvasExists = () => {
-      const canvas = document.querySelector('[data-canvas-space="true"]');
-      setCanvasExists(!!canvas);
-    };
-
-    // Check on mount
-    checkCanvasExists();
-
-    // Set up resize listener
-    window.addEventListener("resize", checkCanvasExists);
-
-    // Clean up
-    return () => {
-      window.removeEventListener("resize", checkCanvasExists);
-    };
-  }, []);
-
   if (
     !message.renderedComponent ||
     role !== "assistant" ||
@@ -971,38 +951,9 @@ const MessageRenderedComponentArea = React.forwardRef<
       {...props}
     >
       {children ??
-        (canvasExists && canDrag ? (
-          <div className="flex items-center gap-3 pl-4">
-            <button
-              onClick={() => {
-                if (typeof window !== "undefined") {
-                  window.dispatchEvent(
-                    new CustomEvent("tambo:showComponent", {
-                      detail: {
-                        messageId: message.id,
-                        component: message.renderedComponent,
-                      },
-                    }),
-                  );
-                }
-              }}
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer group"
-              aria-label="View component in canvas"
-            >
-              View component
-              <ExternalLink className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={addToDashboard}
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer group"
-              aria-label="Add component to dashboard"
-            >
-              Add to dashboard
-            </button>
-          </div>
-        ) : canDrag ? (
+        (canDrag ? (
           <div>
-            <div className="flex justify-start pl-2">
+            <div className="flex justify-start pl-2 gap-3">
               <button
                 onClick={addToDashboard}
                 className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors duration-200 cursor-pointer group"

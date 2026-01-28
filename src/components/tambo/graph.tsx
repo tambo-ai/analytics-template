@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { cva } from "class-variance-authority";
 import * as React from "react";
 import * as RechartsCore from "recharts";
-import { z } from "zod";
+import { z } from "zod/v3";
 
 /**
  * Type for graph variant
@@ -156,7 +156,12 @@ export type GraphProps = z.infer<typeof graphSchema>;
 export type GraphDataType = z.infer<typeof graphDataSchema>;
 
 /**
- * Default colors for the Graph component
+ * Default colors for the Graph component.
+ *
+ * Color handling: our v4 theme defines CSS variables like `--border`,
+ * `--muted-foreground`, and `--chart-1` as full OKLCH color values in
+ * `globals-v4.css`, so we pass them directly as `var(--token)` to
+ * Recharts/SVG props instead of wrapping them in `hsl()`/`oklch()`.
  */
 const defaultColors = [
   "hsl(220, 100%, 62%)", // Blue
@@ -191,12 +196,15 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
     { className, variant, size, data, title, showLegend = true, ...props },
     ref,
   ) => {
+    // Use larger size for pie charts by default to give them more room
+    const effectiveSize = size ?? (data?.type === "pie" ? "lg" : "default");
+
     // If no data received yet, show loading
     if (!data) {
       return (
         <div
           ref={ref}
-          className={cn(graphVariants({ variant, size }), className)}
+          className={cn(graphVariants({ variant, size: effectiveSize }), className)}
           {...props}
         >
           <div className="p-4 h-full flex items-center justify-center">
@@ -227,7 +235,7 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
       return (
         <div
           ref={ref}
-          className={cn(graphVariants({ variant, size }), className)}
+          className={cn(graphVariants({ variant, size: effectiveSize }), className)}
           {...props}
         >
           <div className="p-4 h-full flex items-center justify-center">
@@ -252,7 +260,7 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
       return (
         <div
           ref={ref}
-          className={cn(graphVariants({ variant, size }), className)}
+          className={cn(graphVariants({ variant, size: effectiveSize }), className)}
           {...props}
         >
           <div className="p-4 h-full flex items-center justify-center">
@@ -460,10 +468,10 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
     };
 
     return (
-      <GraphErrorBoundary className={className} variant={variant} size={size}>
+      <GraphErrorBoundary className={className} variant={variant} size={effectiveSize}>
         <div
           ref={ref}
-          className={cn(graphVariants({ variant, size }), className)}
+          className={cn(graphVariants({ variant, size: effectiveSize }), className)}
           {...props}
         >
           <div className="p-4 h-full">
