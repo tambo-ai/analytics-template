@@ -14,7 +14,7 @@ A Next.js analytics dashboard powered by [Tambo AI](https://tambo.co) for genera
 
 ## Demo
 
-<video src="./2025-08-30-tambo-analytics.mp4" controls width="720"></video>
+<video src="https://github.com/user-attachments/assets/d2f91b3c-b2b8-4aef-80d1-0ff3d509fe3d" controls width="720"></video>
 
 ## Get Started
 
