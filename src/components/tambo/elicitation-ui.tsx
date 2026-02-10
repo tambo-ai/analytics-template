@@ -8,49 +8,8 @@ import {
 import * as React from "react";
 import { useMemo, useState } from "react";
 
-/**
- * JSON Schema field types for elicitation
- * Defined locally since the MCP SDK types requestedSchema as unknown
- */
-interface BaseFieldSchema {
-  type: "string" | "number" | "integer" | "boolean";
-  description?: string;
-  default?: unknown;
-}
-
-interface StringFieldSchema extends BaseFieldSchema {
-  type: "string";
-  enum?: string[];
-  enumNames?: string[];
-  minLength?: number;
-  maxLength?: number;
-  pattern?: string;
-  format?: "email" | "uri" | "date" | "date-time" | string;
-}
-
-interface NumberFieldSchema extends BaseFieldSchema {
-  type: "number" | "integer";
-  minimum?: number;
-  maximum?: number;
-}
-
-interface BooleanFieldSchema extends BaseFieldSchema {
-  type: "boolean";
-}
-
-type FieldSchema = StringFieldSchema | NumberFieldSchema | BooleanFieldSchema;
-
-interface ElicitationSchema {
-  properties: Record<string, FieldSchema>;
-  required?: string[];
-}
-
-/**
- * Type-safe accessor for elicitation request schema
- */
-function getRequestSchema(request: TamboElicitationRequest): ElicitationSchema {
-  return request.requestedSchema as ElicitationSchema;
-}
+type FieldSchema =
+  TamboElicitationRequest["requestedSchema"]["properties"][string];
 
 /**
  * Props for individual field components
@@ -330,18 +289,16 @@ const Field: React.FC<FieldProps> = (props) => {
  * (one field that is boolean or enum)
  */
 function isSingleEntryMode(request: TamboElicitationRequest): boolean {
-  const schema = getRequestSchema(request);
-  const fields = Object.entries(schema.properties);
+  const fields = Object.entries(request.requestedSchema.properties);
 
   if (fields.length !== 1) {
     return false;
   }
 
-  const [, fieldSchema] = fields[0];
+  const [, schema] = fields[0];
 
   return (
-    fieldSchema.type === "boolean" ||
-    (fieldSchema.type === "string" && "enum" in fieldSchema)
+    schema.type === "boolean" || (schema.type === "string" && "enum" in schema)
   );
 }
 
@@ -492,14 +449,13 @@ export const ElicitationUI: React.FC<ElicitationUIProps> = ({
   className,
 }) => {
   const singleEntry = isSingleEntryMode(request);
-  const schema = getRequestSchema(request);
   const fields = useMemo(
-    () => Object.entries(schema.properties),
-    [schema.properties],
+    () => Object.entries(request.requestedSchema.properties),
+    [request.requestedSchema.properties],
   );
   const requiredFields = useMemo(
-    () => schema.required ?? [],
-    [schema.required],
+    () => request.requestedSchema.required ?? [],
+    [request.requestedSchema.required],
   );
   const [formData, setFormData] = useState<Record<string, unknown>>(() => {
     const initial: Record<string, unknown> = {};
@@ -658,7 +614,7 @@ export const ElicitationUI: React.FC<ElicitationUIProps> = ({
           type="button"
           onClick={handleAccept}
           disabled={!isValid}
-          className="px-6 py-2 text-sm rounded-lg bg-black/80 text-white hover:bg-black/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="px-6 py-2 text-sm rounded-lg bg-foreground text-background hover:bg-foreground/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Submit
         </button>
