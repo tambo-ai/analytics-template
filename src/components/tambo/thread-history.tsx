@@ -3,10 +3,10 @@
 import { cn } from "@/lib/utils";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
+  type ThreadListResponse,
   useTambo,
   useTamboThreadList,
 } from "@tambo-ai/react";
-import type { ThreadListResponse } from "@tambo-ai/react";
 import {
   ArrowLeftToLine,
   ArrowRightToLine,
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import React, { useMemo } from "react";
 
+/** Thread item from the thread list API */
 type ThreadListItem = ThreadListResponse["threads"][number];
 
 /**
@@ -29,14 +30,13 @@ interface ThreadHistoryContextValue {
   refetch: () => Promise<unknown>;
   currentThreadId: string;
   switchThread: (threadId: string) => void;
-  startNewThread: () => void;
+  startNewThread: () => string;
   searchQuery: string;
   setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
   isCollapsed: boolean;
   setIsCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
   onThreadChange?: () => void;
   position?: "left" | "right";
-  updateThreadName: (threadId: string, name: string) => Promise<void>;
 }
 
 const ThreadHistoryContext =
@@ -78,19 +78,9 @@ const ThreadHistory = React.forwardRef<HTMLDivElement, ThreadHistoryProps>(
     const [isCollapsed, setIsCollapsed] = React.useState(defaultCollapsed);
     const [shouldFocusSearch, setShouldFocusSearch] = React.useState(false);
 
-    const {
-      data: threads,
-      isLoading,
-      error,
-      refetch,
-    } = useTamboThreadList();
+    const { data: threads, isLoading, error, refetch } = useTamboThreadList();
 
-    const {
-      switchThread,
-      startNewThread,
-      currentThreadId,
-      updateThreadName,
-    } = useTambo();
+    const { switchThread, startNewThread, currentThreadId } = useTambo();
 
     // Update CSS variable when sidebar collapses/expands
     React.useEffect(() => {
@@ -123,7 +113,6 @@ const ThreadHistory = React.forwardRef<HTMLDivElement, ThreadHistoryProps>(
         setIsCollapsed,
         onThreadChange,
         position,
-        updateThreadName,
       }),
       [
         threads,
@@ -137,14 +126,11 @@ const ThreadHistory = React.forwardRef<HTMLDivElement, ThreadHistoryProps>(
         isCollapsed,
         onThreadChange,
         position,
-        updateThreadName,
       ],
     );
 
     return (
-      <ThreadHistoryContext.Provider
-        value={contextValue as ThreadHistoryContextValue}
-      >
+      <ThreadHistoryContext.Provider value={contextValue}>
         <div
           ref={ref}
           className={cn(
@@ -369,15 +355,18 @@ const ThreadHistoryList = React.forwardRef<
     currentThreadId,
     switchThread,
     onThreadChange,
-    refetch,
-    updateThreadName,
   } = useThreadHistoryContext();
 
-  const [editingThread, setEditingThread] = React.useState<ThreadListItem | null>(
-    null,
-  );
+  const [hasMounted, setHasMounted] = React.useState(false);
+  const [editingThread, setEditingThread] =
+    React.useState<ThreadListItem | null>(null);
   const [newName, setNewName] = React.useState("");
   const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // Prevent hydration mismatch: treat as loading until mounted on the client
+  React.useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   // Handle click outside name editing input
   React.useEffect(() => {
@@ -422,10 +411,8 @@ const ThreadHistoryList = React.forwardRef<
 
     const query = searchQuery.toLowerCase();
     return threads.threads.filter((thread: ThreadListItem) => {
-      const nameMatches = thread.name?.toLowerCase().includes(query) ?? false;
       const idMatches = thread.id.toLowerCase().includes(query);
-
-      return idMatches ? true : nameMatches;
+      return idMatches;
     });
   }, [isCollapsed, threads, searchQuery]);
 
@@ -442,24 +429,20 @@ const ThreadHistoryList = React.forwardRef<
 
   const handleRename = (thread: ThreadListItem) => {
     setEditingThread(thread);
-    setNewName(thread.name ?? "");
+    setNewName(`Thread ${thread.id.substring(0, 8)}`);
   };
 
   const handleNameSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingThread || !newName.trim()) return;
-    try {
-      await updateThreadName(editingThread.id, newName.trim());
-      await refetch();
-    } catch (error) {
-      console.error("Failed to rename thread:", error);
-    }
+    if (!editingThread) return;
+
+    // Thread renaming is not supported in V1 API
     setEditingThread(null);
   };
 
   // Content to show
   let content;
-  if (isLoading) {
+  if (!hasMounted || isLoading) {
     content = (
       <div
         ref={ref}
@@ -536,7 +519,7 @@ const ThreadHistoryList = React.forwardRef<
               ) : (
                 <>
                   <span className="font-medium line-clamp-1">
-                    {thread.name ?? `Thread ${thread.id.substring(0, 8)}`}
+                    {`Thread ${thread.id.substring(0, 8)}`}
                   </span>
                   <p className="text-xs text-muted-foreground truncate mt-1">
                     {new Date(thread.createdAt).toLocaleString(undefined, {
@@ -549,10 +532,7 @@ const ThreadHistoryList = React.forwardRef<
                 </>
               )}
             </div>
-            <ThreadOptionsDropdown
-              thread={thread}
-              onRename={handleRename}
-            />
+            <ThreadOptionsDropdown thread={thread} onRename={handleRename} />
           </div>
         ))}
       </div>

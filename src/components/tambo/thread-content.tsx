@@ -24,7 +24,6 @@ import * as React from "react";
 interface ThreadContentContextValue {
   messages: TamboThreadMessage[];
   isGenerating: boolean;
-  generationStage?: string;
   variant?: VariantProps<typeof messageVariants>["variant"];
 }
 
@@ -75,17 +74,16 @@ export interface ThreadContentProps extends React.HTMLAttributes<HTMLDivElement>
  */
 const ThreadContent = React.forwardRef<HTMLDivElement, ThreadContentProps>(
   ({ children, className, variant, ...props }, ref) => {
-    const { messages, isIdle, streamingState } = useTambo();
+    const { messages, isIdle } = useTambo();
     const isGenerating = !isIdle;
 
     const contextValue = React.useMemo(
       () => ({
         messages,
         isGenerating,
-        generationStage: streamingState.status === "streaming" ? "STREAMING_RESPONSE" : streamingState.status === "waiting" ? "FETCHING_CONTEXT" : "COMPLETE",
         variant,
       }),
-      [messages, isGenerating, streamingState.status, variant],
+      [messages, isGenerating, variant],
     );
 
     return (
@@ -129,6 +127,9 @@ const ThreadContentMessages = React.forwardRef<
 
   const filteredMessages = messages.filter((message) => {
     if (message.role === "system") return false;
+    // Hide messages that only contain tool_result content blocks.
+    // These are consumed by ToolcallInfo on the preceding tool_use message
+    // and shouldn't render as standalone message bubbles.
     if (
       message.content.length > 0 &&
       message.content.every((block) => block.type === "tool_result")

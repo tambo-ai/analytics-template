@@ -1,14 +1,14 @@
 "use client";
 
-import { MessageGenerationStage } from "@/components/tambo/message-generation-stage";
-import {
-  Tooltip,
-  TooltipProvider,
-} from "@/components/tambo/suggestions-tooltip";
+import { MessageGenerationStage } from "./message-generation-stage";
+import { Tooltip, TooltipProvider } from "./suggestions-tooltip";
 import { cn } from "@/lib/utils";
-import type { Suggestion } from "@tambo-ai/react";
-import { useTambo, useTamboSuggestions } from "@tambo-ai/react";
-import { Loader2Icon } from "lucide-react";
+import type { Suggestion, TamboThreadMessage } from "@tambo-ai/react";
+import {
+  useTambo,
+  useTamboSuggestions,
+  useTamboThreadInput,
+} from "@tambo-ai/react";
 import * as React from "react";
 import { useEffect, useRef } from "react";
 
@@ -27,9 +27,8 @@ interface MessageSuggestionsContextValue {
   accept: (options: { suggestion: Suggestion }) => Promise<void>;
   isGenerating: boolean;
   error: Error | null;
-  messages: { id: string; role: string }[];
-  isIdle: boolean;
-  streamingStatus: string;
+  messages: TamboThreadMessage[];
+  isStreaming: boolean;
   isMac: boolean;
 }
 
@@ -95,7 +94,8 @@ const MessageSuggestions = React.forwardRef<
     },
     ref,
   ) => {
-    const { messages, isIdle, streamingState } = useTambo();
+    const { messages, isStreaming } = useTambo();
+    const { setValue } = useTamboThreadInput();
     const {
       suggestions: generatedSuggestions,
       selectedSuggestionId,
@@ -107,13 +107,13 @@ const MessageSuggestions = React.forwardRef<
     // Combine initial and generated suggestions, but only use initial ones when thread is empty
     const suggestions = React.useMemo(() => {
       // Only use pre-seeded suggestions if thread is empty
-      if (!messages?.length && initialSuggestions.length > 0) {
+      if (!messages.length && initialSuggestions.length > 0) {
         return initialSuggestions.slice(0, maxSuggestions);
       }
       // Otherwise use generated suggestions
       return generatedSuggestions;
     }, [
-      messages?.length,
+      messages.length,
       generatedSuggestions,
       initialSuggestions,
       maxSuggestions,
@@ -134,8 +134,7 @@ const MessageSuggestions = React.forwardRef<
         isGenerating,
         error,
         messages,
-        isIdle,
-        streamingStatus: streamingState.status,
+        isStreaming,
         isMac,
       }),
       [
@@ -145,16 +144,17 @@ const MessageSuggestions = React.forwardRef<
         isGenerating,
         error,
         messages,
-        isIdle,
-        streamingState.status,
+        isStreaming,
         isMac,
       ],
     );
 
     // Find the last AI message
-    const lastAiMessage = messages?.length
-      ? [...messages].reverse().find((msg) => msg.role === "assistant")
-      : null;
+    const lastAiMessage =
+      messages.length > 0
+        ? (messages.toReversed().find((msg) => msg.role === "assistant") ??
+          null)
+        : null;
 
     // When a new AI message appears, update the reference
     useEffect(() => {
@@ -188,8 +188,12 @@ const MessageSuggestions = React.forwardRef<
           const keyNum = parseInt(event.key);
           if (!isNaN(keyNum) && keyNum > 0 && keyNum <= suggestions.length) {
             event.preventDefault();
-            const suggestionIndex = keyNum - 1;
-            void accept({ suggestion: suggestions[suggestionIndex] });
+            const suggestion = suggestions[keyNum - 1];
+            const content =
+              suggestion.detailedSuggestion ?? suggestion.title;
+            if (content) {
+              setValue(content);
+            }
           }
         }
       };
@@ -199,10 +203,10 @@ const MessageSuggestions = React.forwardRef<
       return () => {
         document.removeEventListener("keydown", handleKeyDown);
       };
-    }, [suggestions, accept, isMac]);
+    }, [suggestions, setValue, isMac]);
 
     // If we have no messages yet and no initial suggestions, render nothing
-    if (!messages?.length && initialSuggestions.length === 0) {
+    if (!messages.length && initialSuggestions.length === 0) {
       return null;
     }
 
@@ -247,18 +251,14 @@ const MessageSuggestionsStatus = React.forwardRef<
   HTMLDivElement,
   MessageSuggestionsStatusProps
 >(({ className, ...props }, ref) => {
-  const { error, isGenerating, isIdle, streamingStatus } = useMessageSuggestionsContext();
+  const { error, isGenerating, isStreaming } = useMessageSuggestionsContext();
 
   return (
     <div
       ref={ref}
       className={cn(
         "p-2 rounded-md text-sm bg-transparent",
-        !error &&
-          !isGenerating &&
-          isIdle
-          ? "p-0 min-h-0 mb-0"
-          : "",
+        !error && !isGenerating && !isStreaming ? "p-0 min-h-0 mb-0" : "",
         className,
       )}
       data-slot="message-suggestions-status"
@@ -273,39 +273,12 @@ const MessageSuggestionsStatus = React.forwardRef<
 
       {/* Always render a container for generation stage to prevent layout shifts */}
       <div className="generation-stage-container">
-        <GenerationStageContent
-          streamingStatus={streamingStatus}
-          isGenerating={isGenerating}
-        />
+        {isStreaming && <MessageGenerationStage />}
       </div>
     </div>
   );
 });
 MessageSuggestionsStatus.displayName = "MessageSuggestions.Status";
-
-/**
- * Internal component to render generation stage content
- */
-function GenerationStageContent({
-  streamingStatus,
-  isGenerating,
-}: {
-  streamingStatus?: string;
-  isGenerating: boolean;
-}) {
-  if (streamingStatus && streamingStatus !== "idle") {
-    return <MessageGenerationStage />;
-  }
-  if (isGenerating) {
-    return (
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <Loader2Icon className="h-4 w-4 animate-spin" />
-        <p>Generating suggestions...</p>
-      </div>
-    );
-  }
-  return null;
-}
 
 /**
  * Props for the MessageSuggestionsList component.
@@ -329,14 +302,27 @@ const MessageSuggestionsList = React.forwardRef<
   HTMLDivElement,
   MessageSuggestionsListProps
 >(({ className, ...props }, ref) => {
-  const { suggestions, selectedSuggestionId, accept, isGenerating, isMac } =
+  const { suggestions, selectedSuggestionId, isGenerating, isMac } =
     useMessageSuggestionsContext();
+  const { setValue } = useTamboThreadInput();
 
   const modKey = isMac ? "⌘" : "Ctrl";
   const altKey = isMac ? "⌥" : "Alt";
 
   // Create placeholder suggestions when there are no real suggestions
   const placeholders = Array(3).fill(null);
+
+  const handleSuggestionClick = React.useCallback(
+    async (suggestion: Suggestion) => {
+      if (isGenerating) return;
+
+      const content = suggestion.detailedSuggestion ?? suggestion.title;
+      if (content) {
+        setValue(content);
+      }
+    },
+    [isGenerating, setValue],
+  );
 
   return (
     <div
@@ -369,9 +355,7 @@ const MessageSuggestionsList = React.forwardRef<
                     isSelected: selectedSuggestionId === suggestion.id,
                   }),
                 )}
-                onClick={async () =>
-                  !isGenerating && (await accept({ suggestion }))
-                }
+                onClick={() => handleSuggestionClick(suggestion)}
                 disabled={isGenerating}
                 data-suggestion-id={suggestion.id}
                 data-suggestion-index={index}
@@ -414,4 +398,10 @@ function getSuggestionButtonClassName({
   return "bg-background hover:bg-accent hover:text-accent-foreground";
 }
 
-export { MessageSuggestions, MessageSuggestionsList, MessageSuggestionsStatus };
+export {
+  MessageSuggestions,
+  MessageSuggestionsList,
+  MessageSuggestionsStatus,
+  Tooltip,
+  TooltipProvider,
+};

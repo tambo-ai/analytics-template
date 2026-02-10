@@ -26,7 +26,12 @@ export function MessageGenerationStage({
     return null;
   }
 
-  const label = isWaiting ? "Preparing response" : isStreaming ? "Generating response" : "";
+  let label = "";
+  if (isWaiting) {
+    label = "Preparing response";
+  } else if (isStreaming) {
+    label = "Generating response";
+  }
 
   if (!label) {
     return null;
