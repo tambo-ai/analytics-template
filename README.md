@@ -104,7 +104,7 @@ export default function Chat() {
     >
       <TamboMcpProvider mcpServers={mcpServers}>
         <div className="flex h-full">
-          <MessageThreadFull contextKey="tambo-template" />
+          <MessageThreadFull />
           <div className="hidden md:block w-[60%]">
             <InteractableTabs interactableId="Tabs" />
             <InteractableCanvasDetails interactableId="CanvasDetails" />

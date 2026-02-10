@@ -10,8 +10,7 @@
 
 import { Graph, graphSchema } from "@/components/tambo/graph";
 import { SelectForm, selectFormSchema } from "@/components/tambo/select-form";
-import type { TamboComponent } from "@tambo-ai/react";
-import { TamboTool } from "@tambo-ai/react";
+import type { TamboComponent, TamboTool } from "@tambo-ai/react";
 import { z } from "zod";
 import {
   getSalesData,
@@ -34,53 +33,41 @@ export const tools: TamboTool[] = [
     description:
       "Get monthly sales revenue and units data. Can filter by region (North, South, East, West) or category (Electronics, Clothing, Home)",
     tool: getSalesData,
-    toolSchema: z.function().args(
-      z
-        .object({
-          region: z.string().optional(),
-          category: z.string().optional(),
-        })
-        .default({}),
-    ),
+    inputSchema: z.object({
+      region: z.string().optional(),
+      category: z.string().optional(),
+    }),
+    outputSchema: z.any(),
   },
   {
     name: "getProducts",
     description:
       "Get top products with sales and revenue information. Can filter by category (Electronics, Furniture, Appliances)",
     tool: getProducts,
-    toolSchema: z.function().args(
-      z
-        .object({
-          category: z.string().optional(),
-        })
-        .default({}),
-    ),
+    inputSchema: z.object({
+      category: z.string().optional(),
+    }),
+    outputSchema: z.any(),
   },
   {
     name: "getUserData",
     description:
       "Get monthly user growth and activity data. Can filter by segment (Free, Premium, Enterprise)",
     tool: getUserData,
-    toolSchema: z.function().args(
-      z
-        .object({
-          segment: z.string().optional(),
-        })
-        .default({}),
-    ),
+    inputSchema: z.object({
+      segment: z.string().optional(),
+    }),
+    outputSchema: z.any(),
   },
   {
     name: "getKPIs",
     description:
       "Get key business performance indicators. Can filter by category (Financial, Growth, Quality, Retention, Marketing)",
     tool: getKPIs,
-    toolSchema: z.function().args(
-      z
-        .object({
-          category: z.string().optional(),
-        })
-        .default({}),
-    ),
+    inputSchema: z.object({
+      category: z.string().optional(),
+    }),
+    outputSchema: z.any(),
   },
 ];
 
@@ -96,14 +83,16 @@ export const components: TamboComponent[] = [
     name: "Graph",
     description:
       "Use this when you want to display a chart. It supports bar, line, and pie charts. When you see data generally use this component. IMPORTANT: When asked to create a graph, always generate it first in the chat - do NOT add it directly to the canvas/dashboard. Let the user decide if they want to add it.",
-    component: Graph,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    component: Graph as any,
     propsSchema: graphSchema,
   },
   {
     name: "SelectForm",
     description:
       "ALWAYS use this component instead of listing options as bullet points in text. Whenever you need to ask the user a question and would normally follow up with bullet points or numbered options, use this component instead. For yes/no or single-choice questions, use mode='single'. For questions where the user can select multiple options, use mode='multi' (default). Each group has a label (the question) and options (the choices). Examples: 'Would you like to continue?' with Yes/No options, or 'Which regions interest you?' with multiple region options.",
-    component: SelectForm,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    component: SelectForm as any,
     propsSchema: selectFormSchema,
   },
   // Add more components here

@@ -196,15 +196,12 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
     { className, variant, size, data, title, showLegend = true, ...props },
     ref,
   ) => {
-    // Use larger size for pie charts by default to give them more room
-    const effectiveSize = size ?? (data?.type === "pie" ? "lg" : "default");
-
     // If no data received yet, show loading
     if (!data) {
       return (
         <div
           ref={ref}
-          className={cn(graphVariants({ variant, size: effectiveSize }), className)}
+          className={cn(graphVariants({ variant, size }), className)}
           {...props}
         >
           <div className="p-4 h-full flex items-center justify-center">
@@ -235,7 +232,7 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
       return (
         <div
           ref={ref}
-          className={cn(graphVariants({ variant, size: effectiveSize }), className)}
+          className={cn(graphVariants({ variant, size }), className)}
           {...props}
         >
           <div className="p-4 h-full flex items-center justify-center">
@@ -260,7 +257,7 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
       return (
         <div
           ref={ref}
-          className={cn(graphVariants({ variant, size: effectiveSize }), className)}
+          className={cn(graphVariants({ variant, size }), className)}
           {...props}
         >
           <div className="p-4 h-full flex items-center justify-center">
@@ -468,10 +465,10 @@ export const Graph = React.forwardRef<HTMLDivElement, GraphProps>(
     };
 
     return (
-      <GraphErrorBoundary className={className} variant={variant} size={effectiveSize}>
+      <GraphErrorBoundary className={className} variant={variant} size={size}>
         <div
           ref={ref}
-          className={cn(graphVariants({ variant, size: effectiveSize }), className)}
+          className={cn(graphVariants({ variant, size }), className)}
           {...props}
         >
           <div className="p-4 h-full">

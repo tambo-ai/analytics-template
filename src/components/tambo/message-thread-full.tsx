@@ -17,7 +17,7 @@ import {
   MessageSuggestionsStatus,
 } from "@/components/tambo/message-suggestions";
 import { ScrollableMessageContainer } from "@/components/tambo/scrollable-message-container";
-import { ThreadContainer, useThreadContainerContext } from "./thread-container";
+import { ThreadContainer, useThreadContainerContext } from "@/components/tambo/thread-container";
 import {
   ThreadContent,
   ThreadContentMessages,
