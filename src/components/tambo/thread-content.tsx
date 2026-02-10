@@ -75,17 +75,17 @@ export interface ThreadContentProps extends React.HTMLAttributes<HTMLDivElement>
  */
 const ThreadContent = React.forwardRef<HTMLDivElement, ThreadContentProps>(
   ({ children, className, variant, ...props }, ref) => {
-    const { thread, generationStage, isIdle } = useTambo();
+    const { messages, isIdle, streamingState } = useTambo();
     const isGenerating = !isIdle;
 
     const contextValue = React.useMemo(
       () => ({
-        messages: thread?.messages ?? [],
+        messages,
         isGenerating,
-        generationStage,
+        generationStage: streamingState.status === "streaming" ? "STREAMING_RESPONSE" : streamingState.status === "waiting" ? "FETCHING_CONTEXT" : "COMPLETE",
         variant,
       }),
-      [thread?.messages, isGenerating, generationStage, variant],
+      [messages, isGenerating, streamingState.status, variant],
     );
 
     return (
@@ -127,9 +127,16 @@ const ThreadContentMessages = React.forwardRef<
 >(({ className, ...props }, ref) => {
   const { messages, isGenerating, variant } = useThreadContentContext();
 
-  const filteredMessages = messages.filter(
-    (message) => message.role !== "system" && !message.parentMessageId,
-  );
+  const filteredMessages = messages.filter((message) => {
+    if (message.role === "system") return false;
+    if (
+      message.content.length > 0 &&
+      message.content.every((block) => block.type === "tool_result")
+    ) {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <div

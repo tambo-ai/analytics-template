@@ -1,7 +1,7 @@
 "use client";
 
 import { useCanvasStore } from "@/lib/canvas-storage";
-import { useTamboInteractable, withInteractable } from "@tambo-ai/react";
+import { useTamboInteractable, withTamboInteractable } from "@tambo-ai/react";
 import { useCallback, useEffect, useRef } from "react";
 import { z } from "zod";
 
@@ -192,7 +192,7 @@ function CanvasDetailsWrapper(props: CanvasDetailsProps) {
   );
 }
 
-export const InteractableCanvasDetails = withInteractable(
+export const InteractableCanvasDetails = withTamboInteractable(
   CanvasDetailsWrapper,
   {
     componentName: "CanvasDetails",

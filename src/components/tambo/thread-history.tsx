@@ -3,10 +3,10 @@
 import { cn } from "@/lib/utils";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
-  type TamboThread,
-  useTamboThread,
+  useTambo,
   useTamboThreadList,
 } from "@tambo-ai/react";
+import type { ThreadListResponse } from "@tambo-ai/react";
 import {
   ArrowLeftToLine,
   ArrowRightToLine,
@@ -14,30 +14,29 @@ import {
   Pencil,
   PlusIcon,
   SearchIcon,
-  Sparkles,
 } from "lucide-react";
 import React, { useMemo } from "react";
+
+type ThreadListItem = ThreadListResponse["threads"][number];
 
 /**
  * Context for sharing thread history state and functions
  */
 interface ThreadHistoryContextValue {
-  threads: { items?: TamboThread[] } | null | undefined;
+  threads: ThreadListResponse | null | undefined;
   isLoading: boolean;
   error: Error | null;
   refetch: () => Promise<unknown>;
-  currentThread: TamboThread;
-  switchCurrentThread: (threadId: string) => void;
+  currentThreadId: string;
+  switchThread: (threadId: string) => void;
   startNewThread: () => void;
   searchQuery: string;
   setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
   isCollapsed: boolean;
   setIsCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
   onThreadChange?: () => void;
-  contextKey?: string;
   position?: "left" | "right";
-  updateThreadName: (newName: string, threadId?: string) => Promise<void>;
-  generateThreadName: (threadId: string) => Promise<TamboThread>;
+  updateThreadName: (threadId: string, name: string) => Promise<void>;
 }
 
 const ThreadHistoryContext =
@@ -57,7 +56,6 @@ const useThreadHistoryContext = () => {
  * Root component that provides context for thread history
  */
 interface ThreadHistoryProps extends React.HTMLAttributes<HTMLDivElement> {
-  contextKey?: string;
   onThreadChange?: () => void;
   children?: React.ReactNode;
   defaultCollapsed?: boolean;
@@ -68,7 +66,6 @@ const ThreadHistory = React.forwardRef<HTMLDivElement, ThreadHistoryProps>(
   (
     {
       className,
-      contextKey,
       onThreadChange,
       defaultCollapsed = true,
       position = "left",
@@ -86,15 +83,14 @@ const ThreadHistory = React.forwardRef<HTMLDivElement, ThreadHistoryProps>(
       isLoading,
       error,
       refetch,
-    } = useTamboThreadList({ contextKey });
+    } = useTamboThreadList();
 
     const {
-      switchCurrentThread,
+      switchThread,
       startNewThread,
-      thread: currentThread,
+      currentThreadId,
       updateThreadName,
-      generateThreadName,
-    } = useTamboThread();
+    } = useTambo();
 
     // Update CSS variable when sidebar collapses/expands
     React.useEffect(() => {
@@ -118,34 +114,30 @@ const ThreadHistory = React.forwardRef<HTMLDivElement, ThreadHistoryProps>(
         isLoading,
         error,
         refetch,
-        currentThread,
-        switchCurrentThread,
+        currentThreadId,
+        switchThread,
         startNewThread,
         searchQuery,
         setSearchQuery,
         isCollapsed,
         setIsCollapsed,
         onThreadChange,
-        contextKey,
         position,
         updateThreadName,
-        generateThreadName,
       }),
       [
         threads,
         isLoading,
         error,
         refetch,
-        currentThread,
-        switchCurrentThread,
+        currentThreadId,
+        switchThread,
         startNewThread,
         searchQuery,
         isCollapsed,
         onThreadChange,
-        contextKey,
         position,
         updateThreadName,
-        generateThreadName,
       ],
     );
 
@@ -249,7 +241,7 @@ const ThreadHistoryNewButton = React.forwardRef<
       if (e) e.stopPropagation();
 
       try {
-        await startNewThread();
+        startNewThread();
         await refetch();
         onThreadChange?.();
       } catch (error) {
@@ -374,15 +366,14 @@ const ThreadHistoryList = React.forwardRef<
     error,
     isCollapsed,
     searchQuery,
-    currentThread,
-    switchCurrentThread,
+    currentThreadId,
+    switchThread,
     onThreadChange,
-    updateThreadName,
-    generateThreadName,
     refetch,
+    updateThreadName,
   } = useThreadHistoryContext();
 
-  const [editingThread, setEditingThread] = React.useState<TamboThread | null>(
+  const [editingThread, setEditingThread] = React.useState<ThreadListItem | null>(
     null,
   );
   const [newName, setNewName] = React.useState("");
@@ -427,10 +418,10 @@ const ThreadHistoryList = React.forwardRef<
     // While collapsed we do not need the list, avoid extra work.
     if (isCollapsed) return [];
 
-    if (!threads?.items) return [];
+    if (!threads?.threads) return [];
 
     const query = searchQuery.toLowerCase();
-    return threads.items.filter((thread: TamboThread) => {
+    return threads.threads.filter((thread: ThreadListItem) => {
       const nameMatches = thread.name?.toLowerCase().includes(query) ?? false;
       const idMatches = thread.id.toLowerCase().includes(query);
 
@@ -442,38 +433,28 @@ const ThreadHistoryList = React.forwardRef<
     if (e) e.stopPropagation();
 
     try {
-      switchCurrentThread(threadId);
+      switchThread(threadId);
       onThreadChange?.();
     } catch (error) {
       console.error("Failed to switch thread:", error);
     }
   };
 
-  const handleRename = (thread: TamboThread) => {
+  const handleRename = (thread: ThreadListItem) => {
     setEditingThread(thread);
     setNewName(thread.name ?? "");
   };
 
-  const handleGenerateName = async (thread: TamboThread) => {
-    try {
-      await generateThreadName(thread.id);
-      await refetch();
-    } catch (error) {
-      console.error("Failed to generate name:", error);
-    }
-  };
-
   const handleNameSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingThread) return;
-
+    if (!editingThread || !newName.trim()) return;
     try {
-      await updateThreadName(newName, editingThread.id);
+      await updateThreadName(editingThread.id, newName.trim());
       await refetch();
-      setEditingThread(null);
     } catch (error) {
       console.error("Failed to rename thread:", error);
     }
+    setEditingThread(null);
   };
 
   // Content to show
@@ -517,13 +498,13 @@ const ThreadHistoryList = React.forwardRef<
   } else {
     content = (
       <div className="space-y-1">
-        {filteredThreads.map((thread: TamboThread) => (
+        {filteredThreads.map((thread: ThreadListItem) => (
           <div
             key={thread.id}
             onClick={async () => await handleSwitchThread(thread.id)}
             className={cn(
               "p-2 rounded-md hover:bg-backdrop cursor-pointer group flex items-center justify-between",
-              currentThread?.id === thread.id ? "bg-muted" : "",
+              currentThreadId === thread.id ? "bg-muted" : "",
               editingThread?.id === thread.id ? "bg-muted" : "",
             )}
           >
@@ -571,7 +552,6 @@ const ThreadHistoryList = React.forwardRef<
             <ThreadOptionsDropdown
               thread={thread}
               onRename={handleRename}
-              onGenerateName={handleGenerateName}
             />
           </div>
         ))}
@@ -603,11 +583,9 @@ ThreadHistoryList.displayName = "ThreadHistory.List";
 const ThreadOptionsDropdown = ({
   thread,
   onRename,
-  onGenerateName,
 }: {
-  thread: TamboThread;
-  onRename: (thread: TamboThread) => void;
-  onGenerateName: (thread: TamboThread) => void;
+  thread: ThreadListItem;
+  onRename: (thread: ThreadListItem) => void;
 }) => {
   return (
     <DropdownMenu.Root>
@@ -634,16 +612,6 @@ const ThreadOptionsDropdown = ({
           >
             <Pencil className="h-3 w-3" />
             Rename
-          </DropdownMenu.Item>
-          <DropdownMenu.Item
-            className="flex items-center gap-2 px-2 py-1.5 text-foreground hover:bg-backdrop rounded-sm cursor-pointer outline-none transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              onGenerateName(thread);
-            }}
-          >
-            <Sparkles className="h-3 w-3" />
-            Generate Name
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>

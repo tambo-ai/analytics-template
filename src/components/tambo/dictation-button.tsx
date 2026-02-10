@@ -30,9 +30,9 @@ export default function DictationButton() {
   useEffect(() => {
     if (transcript && transcript !== lastProcessedTranscriptRef.current) {
       lastProcessedTranscriptRef.current = transcript;
-      setValue(value + " " + transcript);
+      setValue((prev) => prev + " " + transcript);
     }
-  }, [transcript, value, setValue]);
+  }, [transcript, setValue]);
 
   if (isTranscribing) {
     return (

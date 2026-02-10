@@ -2,7 +2,7 @@
 
 import type { Canvas, CanvasComponent } from "@/lib/canvas-storage";
 import { useCanvasStore } from "@/lib/canvas-storage";
-import { useTamboInteractable, withInteractable } from "@tambo-ai/react";
+import { useTamboInteractable, withTamboInteractable } from "@tambo-ai/react";
 import { useCallback, useEffect, useRef } from "react";
 import { z } from "zod";
 
@@ -164,7 +164,7 @@ function TabsWrapper(props: TabsProps) {
   return <div className={className} aria-hidden />;
 }
 
-export const InteractableTabs = withInteractable(TabsWrapper, {
+export const InteractableTabs = withTamboInteractable(TabsWrapper, {
   componentName: "Tabs",
   description:
     "Tabs-only interactable. Manages canvases (id, name) and activeCanvasId. Use CanvasDetails to edit charts for the selected tab.",

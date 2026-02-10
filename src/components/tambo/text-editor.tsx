@@ -508,7 +508,7 @@ export const TextEditor = React.forwardRef<HTMLDivElement, TextEditorProps>(
           onSelect: (item: ResourceItem) => {
             // When a mention is selected, add it as a context attachment
             // This will appear as a badge above the input
-            tamboContextAttachmentRef.current.addContextAttachment({ name: item.name });
+            tamboContextAttachmentRef.current.addContextAttachment({ displayName: item.name, context: item.name });
           },
           renderLabel: ({
             node,
