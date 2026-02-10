@@ -1,14 +1,16 @@
 # Generative UI Analytics Template
 
-This is a generative UI analytics template.
-
-Generate graphs with natural language and use natural language to interact with and manage the UI.
+A Next.js analytics dashboard powered by [Tambo AI](https://tambo.co) for generative UI. Ask questions in natural language to generate charts and visualizations, then drag them onto a canvas to build custom dashboards.
 
 ## Features
 
-- Generate graphs inside the chat
-- Drag and drop onto a canvas
-- Edit canvases with natural language in the chat
+- Generate bar, line, and pie charts via natural language
+- Built-in mock analytics data (sales, products, users, KPIs) with filtering
+- Drag and drop generated components onto a canvas
+- Manage multiple canvas tabs as separate workspaces
+- Interactive select forms for structured AI follow-up questions
+- MCP (Model Context Protocol) server integration for external data sources
+- Thread history with persistent context per session
 
 ## Demo
 
@@ -16,96 +18,156 @@ Generate graphs with natural language and use natural language to interact with 
 
 ## Get Started
 
-1. Run `gh repo clone tambo-ai/tambo-analytics-template` for a new project
+1. Create a new project:
 
-2. `cd tambo-analytics-template`
+   ```bash
+   npm create-tambo@latest my-tambo-app
+   ```
 
-3. `npm install`
+2. Install dependencies:
 
-4. `npx tambo init`
-   - or rename `example.env.local` to `.env.local` and set:
+   ```bash
+   npm install
+   ```
 
-     ```env
-     NEXT_PUBLIC_TAMBO_API_KEY=your-api-key
-     ```
+3. Initialize Tambo (sets up your API key):
 
-5. Run `npm run dev` and go to `localhost:3000` to use the app!
+   ```bash
+   npx tambo init
+   ```
 
-## Roadmap
+   Or rename `example.env.local` to `.env.local` and add your API key manually:
 
-- Test with SQL mcp servers
-- Add a Component for executing SQL
-- Add a component for executing Python Transformations
+   ```env
+   NEXT_PUBLIC_TAMBO_API_KEY=your-api-key
+   ```
 
-## App structure at a glance
+   Get an API key from [tambo.co/dashboard](https://tambo.co/dashboard).
 
-- **Next.js app**: Pages under `src/app/`.
-  - `src/app/page.tsx`: landing page.
-  - `src/app/chat/page.tsx`: main chat interface.
+4. Start the dev server:
 
-- **Component registration and chat wiring**: See `src/lib/tambo.ts` and `src/app/chat/page.tsx`.
+   ```bash
+   npm run dev
+   ```
 
-- **Generatable components (created by chat)**: Components the AI can instantiate in the thread, e.g. `src/components/tambo/graph.tsx`, registered in `src/lib/tambo.ts`.
+5. Open `localhost:3000` and navigate to the chat interface.
 
-- **Editable/readable components (stateful UI the chat can modify or inspect)**:
-  - Canvas state in `src/lib/canvas-storage.ts` (Zustand) with canvases and items.
-  - Canvas UI and interactions in `src/components/ui/components-canvas.tsx` and related interactable components like `interactable-tabs.tsx`, `interactable-canvas-details.tsx`.
-  - The chat can update existing components or read current canvas state via the registered tools/hooks that back the chat experience.
+You can also clone directly from GitHub:
 
-For more detailed documentation, visit [Tambo's official docs](https://tambo.co/docs).
+```bash
+gh repo clone tambo-ai/analytics-template
+cd analytics-template
+npm install
+npx tambo init
+npm run dev
+```
 
-## How it works
+## App Structure
 
-Register components the AI can render, with schemas for safe props:
+```
+src/
+├── app/
+│   ├── page.tsx                # Landing page with setup checklist
+│   └── chat/page.tsx           # Main chat + canvas interface
+├── components/
+│   ├── tambo/                  # Chat UI components
+│   │   ├── graph.tsx           # Chart component (bar/line/pie via Recharts)
+│   │   ├── select-form.tsx     # Interactive select/multi-select form
+│   │   ├── message-thread-full.tsx
+│   │   ├── message-input.tsx
+│   │   ├── message.tsx
+│   │   ├── mcp-config-modal.tsx
+│   │   └── ...
+│   └── ui/                     # Canvas and interactable components
+│       ├── components-canvas.tsx         # Drag & drop canvas
+│       ├── interactable-tabs.tsx         # Canvas tab management
+│       └── interactable-canvas-details.tsx
+├── lib/
+│   ├── tambo.ts                # Component & tool registration
+│   ├── canvas-storage.ts       # Zustand canvas state management
+│   ├── thread-hooks.ts         # Thread utility hooks
+│   └── utils.ts
+└── services/
+    └── analytics-data.ts       # Mock analytics data with filtering
+```
+
+## How It Works
+
+### Registering Components
+
+Components registered with Tambo can be rendered by the AI inside the chat thread. Each component needs a name, description, React component, and a Zod schema for props validation.
 
 ```tsx
 // src/lib/tambo.ts (excerpt)
 import { Graph, graphSchema } from "@/components/tambo/graph";
-import { DataCard, dataCardSchema } from "@/components/ui/card-data";
+import { SelectForm, selectFormSchema } from "@/components/tambo/select-form";
 import type { TamboComponent } from "@tambo-ai/react";
 
 export const components: TamboComponent[] = [
   {
     name: "Graph",
-    description: "Render charts (bar/line/pie)",
+    description: "Renders bar, line, and pie charts using Recharts.",
     component: Graph,
     propsSchema: graphSchema,
   },
   {
-    name: "DataCards",
-    description: "Selectable list of info",
-    component: DataCard,
-    propsSchema: dataCardSchema,
+    name: "SelectForm",
+    description: "Interactive select form for structured follow-up questions.",
+    component: SelectForm,
+    propsSchema: selectFormSchema,
   },
 ];
 ```
 
-Wire the chat and the editable canvas UI:
+### Registering Tools
+
+Tools let the AI fetch data or perform actions. This template includes tools for querying mock analytics data with optional filters:
+
+```tsx
+// src/lib/tambo.ts (excerpt)
+import { TamboTool } from "@tambo-ai/react";
+import { getSalesData, getProducts, getUserData, getKPIs } from "@/services/analytics-data";
+
+export const tools: TamboTool[] = [
+  {
+    name: "getSalesData",
+    description: "Get monthly sales revenue and units. Filter by region or category.",
+    tool: getSalesData,
+    toolSchema: z.function().args(
+      z.object({
+        region: z.string().optional(),
+        category: z.string().optional(),
+      }).default({}),
+    ),
+  },
+  { name: "getProducts", /* ... */ },
+  { name: "getUserData", /* ... */ },
+  { name: "getKPIs", /* ... */ },
+];
+```
+
+### Wiring It Together
+
+The chat page sets up `TamboProvider` with the registered components and tools, and wraps everything with `TamboMcpProvider` for MCP support:
 
 ```tsx
 // src/app/chat/page.tsx (excerpt)
-"use client";
-import { TamboProvider } from "@tambo-ai/react";
-import { MessageThreadFull } from "@/components/tambo/message-thread-full";
-import ComponentsCanvas from "@/components/ui/components-canvas";
-import { InteractableTabs } from "@/components/ui/interactable-tabs";
-import { InteractableCanvasDetails } from "@/components/ui/interactable-canvas-details";
-import { components, tools } from "@/lib/tambo";
-import { useMcpServers } from "@/components/tambo/mcp-config-modal";
-import { TamboMcpProvider } from "@tambo-ai/react/mcp";
-
-export default function Chat() {
+export default function Home() {
   const mcpServers = useMcpServers();
+  const contextKey = useContextKey();
+
   return (
     <TamboProvider
       apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
       components={components}
       tools={tools}
+      mcpServers={mcpServers}
+      contextKey={contextKey}
     >
-      <TamboMcpProvider mcpServers={mcpServers}>
-        <div className="flex h-full">
+      <TamboMcpProvider>
+        <div className="flex h-full overflow-hidden">
           <MessageThreadFull />
-          <div className="hidden md:block w-[60%]">
+          <div className="hidden md:block w-[60%] overflow-auto">
             <InteractableTabs interactableId="Tabs" />
             <InteractableCanvasDetails interactableId="CanvasDetails" />
             <ComponentsCanvas className="h-full" />
@@ -117,25 +179,55 @@ export default function Chat() {
 }
 ```
 
+### Canvas System
+
+- **State management**: Zustand store in `src/lib/canvas-storage.ts` manages canvases and their items.
+- **Drag & drop**: Uses `@dnd-kit` for dragging generated components from the chat onto canvas workspaces.
+- **Tabs**: `InteractableTabs` lets users switch between multiple canvas workspaces.
+
+### MCP Integration
+
+Connect external data sources via MCP servers:
+
+1. Configure MCP servers through the settings modal in the chat interface.
+2. Server configs are stored in browser localStorage.
+3. Supports SSE and HTTP MCP server transports.
+
 ## Customizing
 
-### Change what components the AI can control
+### Add new components
 
-You can see how the `Graph` component is registered with tambo in `src/lib/tambo.ts`:
+Add a new React component with a Zod schema and register it in `src/lib/tambo.ts`:
 
 ```tsx
-const components: TamboComponent[] = [
+export const components: TamboComponent[] = [
+  // ... existing components
   {
-    name: "Graph",
-    description:
-      "A component that renders various types of charts (bar, line, pie) using Recharts. Supports customizable data visualization with labels, datasets, and styling options.",
-    component: Graph,
-    propsSchema: graphSchema, // zod schema for the component props
+    name: "MyComponent",
+    description: "Describe when the AI should use this component.",
+    component: MyComponent,
+    propsSchema: myComponentSchema,
   },
-  // Add more components
 ];
 ```
 
-You can find more information about the options [here](https://tambo.co/docs/concepts/registering-components)
+See the [Tambo docs on registering components](https://tambo.co/docs/concepts/registering-components) for more details.
+
+### Add new data tools
+
+Create a data-fetching function and register it as a tool in `src/lib/tambo.ts` with a Zod schema for its arguments. The AI will call these tools to retrieve data before rendering components.
+
+### Connect real data sources
+
+Replace the mock data in `src/services/analytics-data.ts` with calls to your actual API, database, or connect an MCP server for external data.
+
+## Built With
+
+- [Tambo AI](https://tambo.co) - Generative UI framework
+- [Next.js](https://nextjs.org) - React framework
+- [Recharts](https://recharts.org) - Charting library
+- [Zustand](https://zustand.docs.pmnd.rs) - State management
+- [@dnd-kit](https://dndkit.com) - Drag and drop
+- [Tailwind CSS](https://tailwindcss.com) - Styling
 
 P.S. We use Tambo under the hood to manage chat state, which components the AI can render, and which components the AI can interact with. Tambo is 100% open source — see the repository at [tambo-ai/tambo](https://github.com/tambo-ai/tambo).
