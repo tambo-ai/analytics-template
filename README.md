@@ -1,3 +1,5 @@
+> **Archived:** This repository is no longer maintained. Our current work is [Charming](https://usecharming.com), the collaborative cloud for apps you build.
+
 # Generative UI Analytics Template
 
 A Next.js analytics dashboard powered by [Tambo AI](https://tambo.co) for generative UI. Ask questions in natural language to generate charts and visualizations, then drag them onto a canvas to build custom dashboards.
